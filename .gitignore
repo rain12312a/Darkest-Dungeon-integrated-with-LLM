@@ -12,5 +12,9 @@ offset_out.txt
 .DS_Store
 Thumbs.db
 
+# Godot exports (large binaries)
+text.exe
+text.pck
+
 # API keys (sensitive)
 scripts/battle/api_config.gd

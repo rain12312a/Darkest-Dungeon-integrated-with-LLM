@@ -11,9 +11,9 @@ func _init() -> void:
 	# 尝试加载外部 API 配置文件（gitignored）
 	var cfg := load("res://scripts/battle/api_config.gd")
 	if cfg:
-		api_key = cfg.get("API_KEY", "")
-		api_url = cfg.get("API_URL", api_url)
-		model = cfg.get("MODEL", model)
+		api_key = cfg.get("API_KEY") if cfg.get("API_KEY") else ""
+		api_url = cfg.get("API_URL") if cfg.get("API_URL") else api_url
+		model = cfg.get("MODEL") if cfg.get("MODEL") else model
 
 # 备用的离线/优雅降级高保真本地语料库
 const MOCK_CRUSADER_RESPONSES := {

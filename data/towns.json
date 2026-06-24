@@ -1,0 +1,25 @@
+{
+	"actions": [
+		{
+			"id": "tavern",
+			"name": "Tavern",
+			"cost": 10,
+			"effect": "stress_reduce",
+			"value": 20
+		},
+		{
+			"id": "clinic",
+			"name": "Clinic",
+			"cost": 10,
+			"effect": "heal",
+			"value": 10
+		},
+		{
+			"id": "embark",
+			"name": "Embark",
+			"cost": 0,
+			"effect": "start_battle",
+			"value": 0
+		}
+	]
+}

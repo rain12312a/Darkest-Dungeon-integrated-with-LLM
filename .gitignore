@@ -1,0 +1,16 @@
+# Godot
+.godot/
+*.import
+export_presets.cfg
+
+# Python debug scripts
+*.py
+debug_*.txt
+offset_out.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# API keys (sensitive)
+scripts/battle/api_config.gd

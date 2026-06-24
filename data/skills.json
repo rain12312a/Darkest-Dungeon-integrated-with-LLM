@@ -1,0 +1,54 @@
+{
+	"skills": [
+		{
+			"id": "strike",
+			"name": "Strike",
+			"type": "damage",
+			"power": 6,
+			"hit": 90,
+			"stress_delta": 0,
+			"target": "enemy",
+			"cooldown": 0
+		},
+		{
+			"id": "guard",
+			"name": "Guard",
+			"type": "buff",
+			"power": 0,
+			"hit": 100,
+			"stress_delta": -2,
+			"target": "self",
+			"cooldown": 1
+		},
+		{
+			"id": "rally",
+			"name": "Rally",
+			"type": "heal",
+			"power": 4,
+			"hit": 100,
+			"stress_delta": -5,
+			"target": "ally",
+			"cooldown": 2
+		},
+		{
+			"id": "claw",
+			"name": "Claw",
+			"type": "damage",
+			"power": 5,
+			"hit": 85,
+			"stress_delta": 2,
+			"target": "enemy",
+			"cooldown": 0
+		},
+		{
+			"id": "howl",
+			"name": "Howl",
+			"type": "stress",
+			"power": 0,
+			"hit": 100,
+			"stress_delta": 8,
+			"target": "enemy",
+			"cooldown": 1
+		}
+	]
+}

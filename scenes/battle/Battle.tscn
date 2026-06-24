@@ -1,0 +1,399 @@
+[gd_scene format=3 uid="uid://ddf4gtsmhy1iw"]
+
+[ext_resource type="Script" uid="uid://u0yypea7w4v5" path="res://scripts/battle/BattleController.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://byn7doyqso6ok" path="res://panels/panel_banner.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://bn28deeragq8e" path="res://panels/panel_hero.png" id="3"]
+[ext_resource type="Texture2D" uid="uid://bqoufoj68fc7b" path="res://panels/panel_inventory.png" id="4"]
+[ext_resource type="Texture2D" uid="uid://dpy75sjl23tqm" path="res://panels/side_decor.png" id="5"]
+[ext_resource type="Texture2D" uid="uid://c8tr8uvtqcuo3" path="res://panels/icons_ability/ability_move.png" id="6"]
+[ext_resource type="Texture2D" uid="uid://bxcpy6ayb8pcs" path="res://panels/icons_ability/ability_pass.png" id="7"]
+[ext_resource type="Texture2D" uid="uid://7cy24scnpc5s" path="res://crypts/crypts.room_wall.barrels.png" id="8_kos6x"]
+
+[node name="Battle" type="Node" unique_id=363113035]
+script = ExtResource("1")
+
+[node name="BattleUI" type="Control" parent="." unique_id=728344468]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Background" type="ColorRect" parent="BattleUI" unique_id=676930926]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.08, 0.06, 0.05, 1)
+
+[node name="Crypts_roomWall_barrels" type="Sprite2D" parent="BattleUI" unique_id=539152384]
+position = Vector2(639.66675, 223.25002)
+scale = Vector2(0.6670139, 0.62430555)
+texture = ExtResource("8_kos6x")
+
+[node name="BattleContainer" type="HBoxContainer" parent="BattleUI" unique_id=1911269982]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/separation = 10
+
+[node name="LeftArea" type="VBoxContainer" parent="BattleUI/BattleContainer" unique_id=1391830289]
+layout_mode = 2
+size_flags_horizontal = 2
+
+[node name="HeroArea" type="HBoxContainer" parent="BattleUI/BattleContainer/LeftArea" unique_id=865434377]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+alignment = 2
+
+[node name="HeroSlot4" type="Control" parent="BattleUI/BattleContainer/LeftArea/HeroArea" unique_id=1747993761]
+custom_minimum_size = Vector2(110, 200)
+layout_mode = 2
+
+[node name="HeroSlot3" type="Control" parent="BattleUI/BattleContainer/LeftArea/HeroArea" unique_id=1747993764]
+custom_minimum_size = Vector2(110, 200)
+layout_mode = 2
+
+[node name="HeroSlot2" type="Control" parent="BattleUI/BattleContainer/LeftArea/HeroArea" unique_id=1747993767]
+custom_minimum_size = Vector2(110, 200)
+layout_mode = 2
+
+[node name="HeroSlot1" type="Control" parent="BattleUI/BattleContainer/LeftArea/HeroArea" unique_id=1747993770]
+custom_minimum_size = Vector2(110, 200)
+layout_mode = 2
+
+[node name="BottomLeftPanel" type="VBoxContainer" parent="BattleUI/BattleContainer/LeftArea" unique_id=1992889364]
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="PanelBanner" type="Control" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel" unique_id=163178275]
+custom_minimum_size = Vector2(400, 70)
+layout_mode = 2
+
+[node name="PanelBannerBg" type="TextureRect" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/PanelBanner" unique_id=1547016991]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 89.0
+offset_top = -68.0
+offset_right = 10.0
+offset_bottom = -68.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2")
+expand_mode = 1
+
+[node name="BannerContent" type="Control" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/PanelBanner" unique_id=1014526807]
+anchors_preset = 0
+offset_left = 15.0
+offset_top = 10.0
+offset_right = -15.0
+offset_bottom = -10.0
+
+[node name="CharacterPortrait" type="ColorRect" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/PanelBanner/BannerContent" unique_id=1975503659]
+custom_minimum_size = Vector2(100, 80)
+layout_mode = 0
+offset_left = 121.00001
+offset_top = -70.0
+offset_right = 221.0
+offset_bottom = 10.0
+scale = Vector2(0.6285107, 0.65324944)
+color = Color(0.2, 0.2, 0.25, 0.5)
+
+[node name="VSeparator1" type="VSeparator" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/PanelBanner/BannerContent" unique_id=801972523]
+layout_mode = 0
+
+[node name="SkillContainer" type="HBoxContainer" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/PanelBanner/BannerContent" unique_id=1567986996]
+layout_mode = 0
+offset_left = 209.0
+offset_top = -62.0
+offset_right = 433.0
+offset_bottom = -4.461609
+scale = Vector2(0.906519, 0.77639645)
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="SkillIconBox1" type="ColorRect" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/PanelBanner/BannerContent/SkillContainer" unique_id=1701646800]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+color = Color(0.2, 0.2, 0.25, 0.5)
+
+[node name="SkillIconBox2" type="ColorRect" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/PanelBanner/BannerContent/SkillContainer" unique_id=124397454]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+color = Color(0.2, 0.2, 0.25, 0.5)
+
+[node name="SkillIconBox3" type="ColorRect" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/PanelBanner/BannerContent/SkillContainer" unique_id=345178559]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+color = Color(0.2, 0.2, 0.25, 0.5)
+
+[node name="SkillIconBox4" type="ColorRect" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/PanelBanner/BannerContent/SkillContainer" unique_id=963126686]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+color = Color(0.2, 0.2, 0.25, 0.5)
+
+[node name="BottomPanelsContainer" type="HBoxContainer" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel" unique_id=1078387842]
+layout_mode = 2
+size_flags_vertical = 2
+theme_override_constants/separation = 0
+
+[node name="PanelHero" type="Control" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/BottomPanelsContainer" unique_id=1500046988]
+custom_minimum_size = Vector2(280, 130)
+layout_mode = 2
+
+[node name="PanelHeroBg" type="TextureRect" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/BottomPanelsContainer/PanelHero" unique_id=643002932]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 120.0
+offset_top = -72.0
+offset_right = 368.0
+offset_bottom = 2.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3")
+expand_mode = 1
+
+[node name="ReposButton" type="TextureButton" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/BottomPanelsContainer/PanelHero" unique_id=1234567890]
+layout_mode = 0
+offset_left = 575.0
+offset_top = -126.0
+offset_right = 647.0
+offset_bottom = -54.0
+scale = Vector2(0.53582066, 0.53582066)
+texture_normal = ExtResource("6")
+
+[node name="SkipButton" type="TextureButton" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/BottomPanelsContainer/PanelHero" unique_id=1234567891]
+layout_mode = 0
+offset_left = 620.0
+offset_top = -126.0
+offset_right = 640.0
+offset_bottom = -54.0
+scale = Vector2(0.53582066, 0.53582066)
+texture_normal = ExtResource("7")
+
+[node name="PanelInventory" type="Control" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/BottomPanelsContainer" unique_id=934561632]
+custom_minimum_size = Vector2(280, 130)
+layout_mode = 2
+
+[node name="PanelInventoryBg" type="TextureRect" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/BottomPanelsContainer/PanelInventory" unique_id=2116752612]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 370.0
+offset_top = -142.0
+offset_right = 586.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("4")
+expand_mode = 1
+
+[node name="SideDecor" type="Control" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/BottomPanelsContainer" unique_id=1933722498]
+custom_minimum_size = Vector2(80, 130)
+layout_mode = 2
+
+[node name="SideDecorBg" type="TextureRect" parent="BattleUI/BattleContainer/LeftArea/BottomLeftPanel/BottomPanelsContainer/SideDecor" unique_id=1070120211]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -560.0
+offset_top = -142.0
+offset_right = -520.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("5")
+expand_mode = 1
+
+[node name="RightArea" type="VBoxContainer" parent="BattleUI/BattleContainer" unique_id=1601788688]
+layout_mode = 2
+size_flags_horizontal = 2
+
+[node name="MonsterArea" type="HBoxContainer" parent="BattleUI/BattleContainer/RightArea" unique_id=1043452986]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="MonsterSlot1" type="Control" parent="BattleUI/BattleContainer/RightArea/MonsterArea" unique_id=-2146973535]
+custom_minimum_size = Vector2(110, 200)
+layout_mode = 2
+
+[node name="MonsterSlot1Bg" type="ColorRect" parent="BattleUI/BattleContainer/RightArea/MonsterArea/MonsterSlot1" unique_id=-2146973534]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.45, 0.15, 0.15, 0.5)
+
+[node name="MonsterLabel1" type="Label" parent="BattleUI/BattleContainer/RightArea/MonsterArea/MonsterSlot1" unique_id=-2146973533]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -7.0
+offset_right = 20.0
+offset_bottom = 7.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "怪物1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MonsterSlot2" type="Control" parent="BattleUI/BattleContainer/RightArea/MonsterArea" unique_id=-2146973532]
+custom_minimum_size = Vector2(110, 200)
+layout_mode = 2
+
+[node name="MonsterSlot2Bg" type="ColorRect" parent="BattleUI/BattleContainer/RightArea/MonsterArea/MonsterSlot2" unique_id=-2146973531]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.45, 0.15, 0.15, 0.5)
+
+[node name="MonsterLabel2" type="Label" parent="BattleUI/BattleContainer/RightArea/MonsterArea/MonsterSlot2" unique_id=-2146973530]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -7.0
+offset_right = 20.0
+offset_bottom = 7.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "怪物2"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MonsterSlot3" type="Control" parent="BattleUI/BattleContainer/RightArea/MonsterArea" unique_id=-2146973529]
+custom_minimum_size = Vector2(110, 200)
+layout_mode = 2
+
+[node name="MonsterSlot3Bg" type="ColorRect" parent="BattleUI/BattleContainer/RightArea/MonsterArea/MonsterSlot3" unique_id=-2146973528]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.45, 0.15, 0.15, 0.5)
+
+[node name="MonsterLabel3" type="Label" parent="BattleUI/BattleContainer/RightArea/MonsterArea/MonsterSlot3" unique_id=-2146973527]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -7.0
+offset_right = 20.0
+offset_bottom = 7.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "怪物3"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MonsterSlot4" type="Control" parent="BattleUI/BattleContainer/RightArea/MonsterArea" unique_id=-2146973526]
+custom_minimum_size = Vector2(110, 200)
+layout_mode = 2
+
+[node name="MonsterSlot4Bg" type="ColorRect" parent="BattleUI/BattleContainer/RightArea/MonsterArea/MonsterSlot4" unique_id=-2146973525]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.45, 0.15, 0.15, 0.5)
+
+[node name="MonsterLabel4" type="Label" parent="BattleUI/BattleContainer/RightArea/MonsterArea/MonsterSlot4" unique_id=-2146973524]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -7.0
+offset_right = 20.0
+offset_bottom = 7.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "怪物4"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BottomRightPanel" type="VBoxContainer" parent="BattleUI/BattleContainer/RightArea" unique_id=-1447604391]
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="BottomPanelsContainerRight" type="HBoxContainer" parent="BattleUI/BattleContainer/RightArea/BottomRightPanel" unique_id=-1447604390]
+layout_mode = 2
+size_flags_vertical = 2
+theme_override_constants/separation = 0
+
+[node name="SideDecorRight" type="Control" parent="BattleUI/BattleContainer/RightArea/BottomRightPanel/BottomPanelsContainerRight" unique_id=1933722499]
+custom_minimum_size = Vector2(80, 130)
+layout_mode = 2
+
+[node name="SideDecorRightBg" type="TextureRect" parent="BattleUI/BattleContainer/RightArea/BottomRightPanel/BottomPanelsContainerRight/SideDecorRight" unique_id=1070120212]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 496.0
+offset_top = -115.0
+offset_right = 550.0
+offset_bottom = 27.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("5")
+expand_mode = 1
+flip_h = true
+
+[node name="SelectedLabel" type="Label" parent="BattleUI/BattleContainer/RightArea" unique_id=1453176858]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.78, 0.55, 1)
+text = "Selected"
+horizontal_alignment = 1
+
+[node name="VictoryPanel" type="Panel" parent="BattleUI" unique_id=1428679446]
+visible = false
+layout_mode = 0
+anchor_left = 0.25
+anchor_top = 0.3
+anchor_right = 0.75
+anchor_bottom = 0.7
+
+[node name="VictoryLabel" type="Label" parent="BattleUI/VictoryPanel" unique_id=546496659]
+layout_mode = 0
+anchor_right = 1.0
+offset_top = 30.0
+offset_bottom = 80.0
+text = "Victory"
+horizontal_alignment = 1
+
+[node name="BackToStartButton" type="Button" parent="BattleUI/VictoryPanel" unique_id=1170567595]
+layout_mode = 0
+anchor_left = 0.25
+anchor_top = 0.62
+anchor_right = 0.75
+anchor_bottom = 0.88
+text = "Back to Start"

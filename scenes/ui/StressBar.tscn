@@ -1,0 +1,6 @@
+[gd_scene load_steps=1 format=3]
+
+[node name="StressBar" type="TextureProgressBar"]
+min_value = 0.0
+max_value = 100.0
+value = 0.0

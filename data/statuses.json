@@ -1,0 +1,23 @@
+{
+	"statuses": [
+		{
+			"id": "panic",
+			"name": "Panic",
+			"type": "debuff",
+			"duration": 2,
+			"effects": {
+				"hit_mod": -10,
+				"stress_gain_mod": 20
+			}
+		},
+		{
+			"id": "guarded",
+			"name": "Guarded",
+			"type": "buff",
+			"duration": 2,
+			"effects": {
+				"def_mod": 10
+			}
+		}
+	]
+}

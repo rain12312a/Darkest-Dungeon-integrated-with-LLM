@@ -1,0 +1,31 @@
+{
+	"heroes": [
+		{
+			"id": "hero_1",
+			"name": "Vanguard",
+			"max_hp": 30,
+			"speed": 5,
+			"stress_threshold": 100,
+			"skills": [
+				"strike",
+				"guard",
+                "rally"
+			],
+			"statuses": []
+		}
+	],
+	"enemies": [
+		{
+			"id": "enemy_1",
+			"name": "Ghoul",
+			"max_hp": 20,
+			"speed": 3,
+			"stress_threshold": 100,
+			"skills": [
+				"claw",
+                "howl"
+			],
+			"statuses": []
+		}
+	]
+}

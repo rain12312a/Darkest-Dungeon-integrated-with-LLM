@@ -12,10 +12,14 @@ var _queue: Array[Dictionary] = []
 func build(heroes: Array[Dictionary], monsters: Array[Dictionary]) -> void:
 	_queue.clear()
 	for i in range(heroes.size()):
-		if heroes[i]["hp"] > 0 and heroes[i]["actions_remaining"] > 0:
+		var h := heroes[i]
+		# 英雄：存活(HP>0)或濒死状态均可行动；尸体不进入队列
+		if (h["hp"] > 0 or h.get("is_death_door", false)) and h["actions_remaining"] > 0:
 			_queue.append({"unit_type": "hero", "index": i})
 	for i in range(monsters.size()):
-		if monsters[i]["hp"] > 0 and monsters[i]["actions_remaining"] > 0:
+		var m := monsters[i]
+		# 怪物：存活且非尸体才进入队列
+		if m["hp"] > 0 and not m.get("is_corpse", false) and m["actions_remaining"] > 0:
 			_queue.append({"unit_type": "monster", "index": i})
 	sort_by_speed(heroes, monsters)
 
@@ -48,10 +52,10 @@ func is_empty() -> bool:
 # 检查给定的英雄 / 怪物数组中是否还有任何存活单位仍有剩余行动次数
 func has_remaining_actions(heroes: Array[Dictionary], monsters: Array[Dictionary]) -> bool:
 	for unit in heroes:
-		if unit["hp"] > 0 and unit["actions_remaining"] > 0:
+		if (unit["hp"] > 0 or unit.get("is_death_door", false)) and unit["actions_remaining"] > 0:
 			return true
 	for unit in monsters:
-		if unit["hp"] > 0 and unit["actions_remaining"] > 0:
+		if unit["hp"] > 0 and not unit.get("is_corpse", false) and unit["actions_remaining"] > 0:
 			return true
 	return false
 
@@ -65,4 +69,6 @@ func _effective_speed(entry: Dictionary, heroes: Array[Dictionary], monsters: Ar
 
 func _is_alive(entry: Dictionary, heroes: Array[Dictionary], monsters: Array[Dictionary]) -> bool:
 	var unit: Dictionary = heroes[entry["index"]] if entry["unit_type"] == "hero" else monsters[entry["index"]]
-	return unit.get("hp", 0) > 0
+	if entry["unit_type"] == "hero":
+		return unit.get("hp", 0) > 0 or unit.get("is_death_door", false)
+	return unit.get("hp", 0) > 0 and not unit.get("is_corpse", false)

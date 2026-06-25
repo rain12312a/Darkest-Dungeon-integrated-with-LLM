@@ -31,6 +31,10 @@ const HIGHWAYMAN_ANIM_MAP := {
 	"walk": "walk",
 }
 
+# 共享死亡特效（death_medium），覆盖在死亡角色上
+const DEATH_MEDIUM_BASE := "res://death_medium/death_medium.sprite"
+const DEATH_MEDIUM_PNG_DIR := "res://death_medium"
+
 const CUTTHROAT_ANIM_BASE := "res://monsters/brigand_cutthroat/anim/brigand_cutthroat.sprite."
 const CUTTHROAT_PNG_DIR := "res://monsters/brigand_cutthroat/anim"
 const CUTTHROAT_ANIM_MAP := {
@@ -41,6 +45,7 @@ const CUTTHROAT_ANIM_MAP := {
 	"combat": "combat",
 	"heroic": "combat",
 	"walk": "combat",
+	"dead": "dead",
 }
 
 # === 骷髅弩手 ===
@@ -54,6 +59,7 @@ const SKELETON_ARBALIST_ANIM_MAP := {
 	"combat": "combat",
 	"heroic": "combat",
 	"walk": "combat",
+	"dead": "dead",
 }
 
 # === 骷髅酒杯 ===
@@ -67,6 +73,7 @@ const SKELETON_COURTIER_ANIM_MAP := {
 	"combat": "combat",
 	"heroic": "combat",
 	"walk": "combat",
+	"dead": "dead",
 }
 
 # === 骷髅勇士 ===
@@ -79,6 +86,7 @@ const SKELETON_COMMON_ANIM_MAP := {
 	"combat": "combat",
 	"heroic": "combat",
 	"walk": "combat",
+	"dead": "dead",
 }
 
 # === 骷髅盾卫 ===
@@ -92,6 +100,7 @@ const SKELETON_DEFENDER_ANIM_MAP := {
 	"combat": "combat",
 	"heroic": "combat",
 	"walk": "combat",
+	"dead": "dead",
 }
 
 # === 骷髅剑士 ===
@@ -104,6 +113,7 @@ const SKELETON_MILITIA_ANIM_MAP := {
 	"combat": "combat",
 	"heroic": "combat",
 	"walk": "combat",
+	"dead": "dead",
 }
 
 # === 骷髅枪兵 ===
@@ -116,6 +126,7 @@ const SKELETON_SPEAR_ANIM_MAP := {
 	"combat": "combat",
 	"heroic": "combat",
 	"walk": "combat",
+	"dead": "dead",
 }
 
 # --- 技能特效映射配置 ---
@@ -427,11 +438,13 @@ func _setup_battle() -> void:
 func _start_new_round() -> void:
 	round_number += 1
 	for hero in heroes:
-		if hero["hp"] > 0:
+		# 存活英雄（含濒死状态）重置行动次数
+		if hero["hp"] > 0 or hero.get("is_death_door", false):
 			hero["actions_remaining"] = 1
 			hero["speed_delta"] = randi_range(-SPEED_DELTA_RANGE, SPEED_DELTA_RANGE)
 	for monster in monsters:
-		if monster["hp"] > 0:
+		# 存活怪物（排除尸体）重置行动次数
+		if monster["hp"] > 0 and not monster.get("is_corpse", false):
 			monster["actions_remaining"] = 1
 			monster["speed_delta"] = randi_range(-SPEED_DELTA_RANGE, SPEED_DELTA_RANGE)
 	turn_queue.build(heroes, monsters)
@@ -468,6 +481,8 @@ func _get_next_actor() -> void:
 			hero_skill_selected = false
 			hero_current_skill = ""
 			reposition_mode = false
+			_in_fx_pause = false
+			monster_current_skill_id = ""
 			_update_ui()
 			return # 等待玩家输入
 		else:
@@ -482,7 +497,11 @@ func _execute_monster_action() -> void:
 	if current_actor.is_empty() or current_actor["unit_type"] != "monster":
 		return
 	var idx: int = current_actor["index"]
-	if monsters[idx]["hp"] <= 0:
+	if idx >= monsters.size():
+		return
+	var m := monsters[idx]
+	# 安全守卫：尸体、已死或无剩余行动次数的怪物不执行
+	if m["hp"] <= 0 or m.get("is_corpse", false) or m.get("actions_remaining", 0) <= 0:
 		return
 		
 	# 立即更新 UI，使该主动行怪摆出 combat（备战待机姿态）并亮起行动指示器 ▲
@@ -529,63 +548,84 @@ func _execute_monster_action() -> void:
 		_in_fx_pause = true
 		monster_current_skill_id = recruited["skill_id"]
 		
-		if target_type == "single_enemy" or target_type == "single_ally":
-			var priority: String = skill_data.get("target_priority", "random")
-			var chosen_target: Dictionary = _select_target_by_priority(valid_targets, priority)
-			if not chosen_target.is_empty():
+		match target_type:
+			"single_enemy", "single_ally":
+				var priority: String = skill_data.get("target_priority", "random")
+				var chosen_target: Dictionary = _select_target_by_priority(valid_targets, priority)
+				if not chosen_target.is_empty():
+					var is_dmg: bool = skill_data.get("effect_type", "") == "damage"
+					if is_dmg:
+						chosen_target["is_defending"] = true
+					_update_ui()
+					
+					_zoom_attack_scene(monsters[idx], [chosen_target], true)
+					_play_skill_fx_v2(monsters[idx], recruited["skill_id"], [chosen_target])
+					if chosen_target.get("is_defending", false):
+						chosen_target["is_defending"] = false
+					var snap_single := _snap_unit(chosen_target)
+					ActionResolver.resolve_on_target(monsters[idx], skill_data, chosen_target)
+					_emit_feedback([chosen_target], [snap_single])
+					
+					# 若目标为英雄则处理濒死/死亡骰
+					var hero_killed := false
+					if target_type == "single_enemy":
+						var target_hero_idx := heroes.find(chosen_target)
+						if target_hero_idx >= 0:
+							hero_killed = _handle_hero_damage_aftermath(target_hero_idx)
+					
+					await get_tree().create_timer(ATTACK_ZOOM_DURATION).timeout
+					
+					# 英雄被击杀 → 仅缩放怪物回正常；否则正常缩放双方
+					if hero_killed:
+						_zoom_combatant(monsters[idx], false)
+					else:
+						_zoom_attack_scene(monsters[idx], [chosen_target], false)
+					_in_fx_pause = false
+					monster_current_skill_id = ""
+					_update_ui()
+					
+					if _check_defeat():
+						return
+
+			"all_enemies", "all_allies":
 				var is_dmg: bool = skill_data.get("effect_type", "") == "damage"
 				if is_dmg:
-					chosen_target["is_defending"] = true
+					for t in valid_targets:
+						t["is_defending"] = true
 				_update_ui()
 				
-				_zoom_attack_scene(monsters[idx], [chosen_target], true)
-				_play_skill_fx_v2(monsters[idx], recruited["skill_id"], [chosen_target])
-				if chosen_target.get("is_defending", false):
-					chosen_target["is_defending"] = false
-				var snap_single := _snap_unit(chosen_target)
-				ActionResolver.resolve_on_target(monsters[idx], skill_data, chosen_target)
-				_emit_feedback([chosen_target], [snap_single])
+				_zoom_attack_scene(monsters[idx], valid_targets, true)
+				_play_skill_fx_v2(monsters[idx], recruited["skill_id"], valid_targets)
+				for t in valid_targets:
+					t["is_defending"] = false
+				var snaps_all: Array[Dictionary] = []
+				for t in valid_targets:
+					snaps_all.append(_snap_unit(t))
+				ActionResolver.resolve_on_all(monsters[idx], skill_data, valid_targets)
+				_emit_feedback(valid_targets, snaps_all)
+				
+				# 若目标为英雄则逐个处理濒死/死亡骰；任一英雄死亡立即标记
+				var any_hero_killed := false
+				if target_type == "all_enemies":
+					for t in valid_targets:
+						var target_hero_idx := heroes.find(t)
+						if target_hero_idx >= 0:
+							if _handle_hero_damage_aftermath(target_hero_idx):
+								any_hero_killed = true
+				
 				await get_tree().create_timer(ATTACK_ZOOM_DURATION).timeout
 				
-				_zoom_attack_scene(monsters[idx], [chosen_target], false)
+				# 缩放恢复：怪物始终恢复；存活的英雄逐个恢复
+				_zoom_combatant(monsters[idx], false)
+				for t in valid_targets:
+					if heroes.find(t) >= 0:
+						_zoom_combatant(t, false)
 				_in_fx_pause = false
 				monster_current_skill_id = ""
 				_update_ui()
-		elif target_type == "all_enemies" or target_type == "all_allies":
-			var is_dmg: bool = skill_data.get("effect_type", "") == "damage"
-			if is_dmg:
-				for t in valid_targets:
-					t["is_defending"] = true
-			_update_ui()
-			
-			_zoom_attack_scene(monsters[idx], valid_targets, true)
-			_play_skill_fx_v2(monsters[idx], recruited["skill_id"], valid_targets)
-			for t in valid_targets:
-				t["is_defending"] = false
-			var snaps_all: Array[Dictionary] = []
-			for t in valid_targets:
-				snaps_all.append(_snap_unit(t))
-			ActionResolver.resolve_on_all(monsters[idx], skill_data, valid_targets)
-			_emit_feedback(valid_targets, snaps_all)
-			await get_tree().create_timer(ATTACK_ZOOM_DURATION).timeout
-			
-			_zoom_attack_scene(monsters[idx], valid_targets, false)
-			_in_fx_pause = false
-			monster_current_skill_id = ""
-			_update_ui()
-		elif target_type == "self":
-			_zoom_attack_scene(monsters[idx], [], true)
-			_play_skill_fx_v2(monsters[idx], recruited["skill_id"], [monsters[idx]])
-			_update_ui()
-			var snap_self := _snap_unit(monsters[idx])
-			ActionResolver.resolve_on_target(monsters[idx], skill_data, monsters[idx])
-			_emit_feedback([monsters[idx]], [snap_self])
-			await get_tree().create_timer(ATTACK_ZOOM_DURATION).timeout
-			
-			_zoom_attack_scene(monsters[idx], [], false)
-			_in_fx_pause = false
-			monster_current_skill_id = ""
-			_update_ui()
+				
+				if _check_defeat():
+					return
 		
 		# 刚才释放过技能，在数值落地后额外停顿 0.4 秒，免得画面切换过快产生“怪物没停顿”的生硬感
 		await get_tree().create_timer(0.4).timeout
@@ -593,8 +633,6 @@ func _execute_monster_action() -> void:
 		# 无可用候选技能时走跳过回合退避方式
 		pass
 		
-	if _check_defeat():
-		return
 	_update_ui()
 
 func _get_valid_targets_for_monster(idx: int, skill_data: Dictionary) -> Array[Dictionary]:
@@ -604,16 +642,17 @@ func _get_valid_targets_for_monster(idx: int, skill_data: Dictionary) -> Array[D
 	
 	if target_type == "single_enemy" or target_type == "all_enemies":
 		for i in range(heroes.size()):
-			if heroes[i]["hp"] > 0:
+			# 存活或濒死状态的英雄均为有效目标
+			if heroes[i]["hp"] > 0 or heroes[i].get("is_death_door", false):
 				if target_positions.is_empty() or ((i + 1) in target_positions):
 					valid_targets.append(heroes[i])
 	elif target_type == "single_ally" or target_type == "all_allies":
 		for i in range(monsters.size()):
-			if monsters[i]["hp"] > 0:
+			if monsters[i]["hp"] > 0 and not monsters[i].get("is_corpse", false):
 				if target_positions.is_empty() or ((i + 1) in target_positions):
 					valid_targets.append(monsters[i])
 	elif target_type == "self":
-		if monsters[idx]["hp"] > 0:
+		if monsters[idx]["hp"] > 0 and not monsters[idx].get("is_corpse", false):
 			valid_targets.append(monsters[idx])
 			
 	return valid_targets
@@ -642,10 +681,27 @@ func _select_target_by_priority(targets: Array, priority: String) -> Dictionary:
 # 胜负判定
 # ============================================================
 
+# 存活且可战斗的单位数（非尸体，非真死）
 func _count_alive(units: Array[Dictionary]) -> int:
 	var n := 0
 	for u in units:
-		if u["hp"] > 0:
+		if u["hp"] > 0 and not u.get("is_corpse", false):
+			n += 1
+	return n
+
+# 英雄存活数（包括濒死状态 is_death_door）
+func _count_heroes_alive() -> int:
+	var n := 0
+	for h in heroes:
+		if h["hp"] > 0 or h.get("is_death_door", false):
+			n += 1
+	return n
+
+# 可战斗怪物数（排除尸体）
+func _count_fighting_monsters() -> int:
+	var n := 0
+	for m in monsters:
+		if m["hp"] > 0 and not m.get("is_corpse", false):
 			n += 1
 	return n
 
@@ -656,13 +712,13 @@ func _first_alive(units: Array[Dictionary]) -> Dictionary:
 	return {}
 
 func _check_victory() -> bool:
-	if _count_alive(monsters) == 0:
+	if _count_fighting_monsters() == 0:
 		_end_battle()
 		return true
 	return false
 
 func _check_defeat() -> bool:
-	if _count_alive(heroes) == 0:
+	if _count_heroes_alive() == 0:
 		_end_battle()
 		return true
 	return false
@@ -672,6 +728,146 @@ func _end_battle() -> void:
 	current_actor = {}
 	if victory_panel:
 		victory_panel.visible = true
+	_update_ui()
+
+# ============================================================
+# 死亡 / 尸体 / 补位 处理
+# ============================================================
+
+# 怪物受到伤害后调用：HP≤0 时创建尸体或清除尸体
+func _handle_monster_damage_aftermath(monster_idx: int) -> void:
+	if monster_idx < 0 or monster_idx >= monsters.size():
+		return
+	var m := monsters[monster_idx]
+	if m.get("is_corpse", false):
+		# 尸体被击杀 → 清除尸体，后方怪物补位
+		if m["hp"] <= 0:
+			_clear_monster_corpse(monster_idx)
+	else:
+		# 正常怪物 HP 降为 0 → 留尸体
+		if m["hp"] <= 0:
+			m["is_corpse"] = true
+			m["hp"] = 10 # 尸体血量
+			m["actions_remaining"] = 0
+			print("[Corpse] ", m["name"], " fell, leaving a corpse with 10 HP")
+
+# 清除怪物尸体并让后方怪物向前补位
+func _clear_monster_corpse(corpse_idx: int) -> void:
+	if corpse_idx < 0 or corpse_idx >= monsters.size():
+		return
+	
+	var key := "monster_%d" % corpse_idx
+	# 播放 death_medium 死亡特效覆盖层（尸体保持 dead 动画）
+	if _spine_players.has(key):
+		var sp = _spine_players[key]
+		if is_instance_valid(sp):
+			_play_death_fx_at(sp.global_position)
+			sp.queue_free()
+	_spine_players.erase(key)
+	_spine_current_state.erase(key)
+	
+	print("[Corpse] Clearing corpse at index ", corpse_idx)
+	monsters.remove_at(corpse_idx)
+	
+	# 重建怪物 SpinePlayer 键值映射（后方怪物向前补位）
+	var new_spine: Dictionary = {}
+	var new_state: Dictionary = {}
+	for i in range(monsters.size()):
+		# 原索引：如果 i >= corpse_idx，则原单位在 i+1 位置
+		var old_key := "monster_%d" % (i + 1 if i >= corpse_idx else i)
+		var new_key := "monster_%d" % i
+		if _spine_players.has(old_key):
+			new_spine[new_key] = _spine_players[old_key]
+		if _spine_current_state.has(old_key):
+			new_state[new_key] = _spine_current_state[old_key]
+	
+	# 合并：保留英雄键（int），替换怪物键（string）
+	var merged_spine: Dictionary = {}
+	var merged_state: Dictionary = {}
+	for k in _spine_players:
+		if not (k is String and k.begins_with("monster_")):
+			merged_spine[k] = _spine_players[k]
+	for k in _spine_current_state:
+		if not (k is String and k.begins_with("monster_")):
+			merged_state[k] = _spine_current_state[k]
+	for k in new_spine:
+		merged_spine[k] = new_spine[k]
+	for k in new_state:
+		merged_state[k] = new_state[k]
+	_spine_players = merged_spine
+	_spine_current_state = merged_state
+	
+	# 重建行动队列
+	turn_queue.build(heroes, monsters)
+	_update_ui()
+
+# 英雄受到伤害后调用：处理濒死/死亡骰
+# 返回 true 表示英雄已真死
+func _handle_hero_damage_aftermath(hero_idx: int) -> bool:
+	if hero_idx < 0 or hero_idx >= heroes.size():
+		return false
+	var h := heroes[hero_idx]
+	if h["hp"] > 0:
+		# 存活状态，检查是否脱离濒死
+		if h.get("is_death_door", false):
+			h["is_death_door"] = false
+			print("[DeathDoor] ", h["name"], " recovered from death's door!")
+		return false
+	
+	# HP ≤ 0
+	if h.get("is_death_door", false):
+		# 已在濒死状态 → 50% 死亡骰
+		if randf() < 0.5:
+			print("[DeathDoor] ", h["name"], " has died at death's door!")
+			_kill_hero(hero_idx)
+			return true
+		else:
+			h["hp"] = 0 # 保持在濒死
+			print("[DeathDoor] ", h["name"], " survived the death blow at death's door!")
+			return false
+	else:
+		# 首次降至 0 → 进入濒死状态
+		h["hp"] = 0
+		h["is_death_door"] = true
+		print("[DeathDoor] ", h["name"], " has entered death's door!")
+		return false
+
+# 英雄真死：播放共享死亡特效后移除并补位
+func _kill_hero(hero_idx: int) -> void:
+	if hero_idx < 0 or hero_idx >= heroes.size():
+		return
+	
+	var hero_name = heroes[hero_idx].get("name", "???")
+	print("[Death] Hero ", hero_name, " has been slain!")
+	
+	# 播放共享 death_medium 死亡特效覆盖层（角色保持受击动画）
+	var sp: SpinePlayer = _spine_players.get(hero_idx) as SpinePlayer
+	if is_instance_valid(sp):
+		_play_death_fx_at(sp.global_position)
+	
+	# 清理 SpinePlayer
+	if _spine_players.has(hero_idx):
+		if is_instance_valid(sp):
+			sp.queue_free()
+		_spine_players.erase(hero_idx)
+	_spine_current_state.erase(hero_idx)
+	
+	heroes.remove_at(hero_idx)
+	
+	# 重建英雄 SpinePlayer 索引映射
+	var new_spine: Dictionary = {}
+	var new_state: Dictionary = {}
+	for i in range(heroes.size()):
+		var old_idx := i + 1 if i >= hero_idx else i
+		if _spine_players.has(old_idx):
+			new_spine[i] = _spine_players[old_idx]
+		if _spine_current_state.has(old_idx):
+			new_state[i] = _spine_current_state[old_idx]
+	_spine_players = new_spine
+	_spine_current_state = new_state
+	
+	# 重建队列
+	turn_queue.build(heroes, monsters)
 	_update_ui()
 
 # ============================================================
@@ -686,9 +882,11 @@ func _on_skill_pressed(skill_id: String) -> void:
 		var use_positions: Array = sd.get("use_positions", [])
 		var hero_pos: int = current_actor["index"] + 1
 		if not use_positions.is_empty() and not (hero_pos in use_positions):
+			print("[Skill] %s unavailable at position %d (requires %s)" % [skill_id, hero_pos, use_positions])
 			return
 	hero_current_skill = skill_id
 	hero_skill_selected = true
+	_in_fx_pause = false
 	_update_ui()
 
 func _on_skip_pressed() -> void:
@@ -763,11 +961,18 @@ func _on_monster_pressed(index: int) -> void:
 	ActionResolver.resolve_on_target(heroes[current_actor["index"]], skill_data, monsters[index])
 	_emit_feedback([monsters[index]], [snap])
 	
+	# 处理怪物尸体创建/清除（可能移除该怪物）
+	var was_cleared: bool = monsters[index].get("is_corpse", false) and monsters[index]["hp"] <= 0
+	_handle_monster_damage_aftermath(index)
+	
 	# 3. 放大 + 特效 + 数字持续 ATTACK_ZOOM_DURATION 秒
 	await get_tree().create_timer(ATTACK_ZOOM_DURATION).timeout
 	
-	# 缩小回正常
-	_zoom_attack_scene(heroes[current_actor["index"]], [monsters[index]], false)
+	# 缩小回正常（若怪物已被清除则只缩放英雄）
+	if was_cleared or index >= monsters.size():
+		_zoom_combatant(heroes[current_actor["index"]], false)
+	else:
+		_zoom_attack_scene(heroes[current_actor["index"]], [monsters[index]], false)
 	
 	# 4. 特效演完，释放锁定并彻底清理已选技能
 	_in_fx_pause = false
@@ -819,11 +1024,24 @@ func _on_attack_all_enemies() -> void:
 	ActionResolver.resolve_on_all(heroes[current_actor["index"]], skill_data, final_targets)
 	_emit_feedback(final_targets, snaps)
 	
+	# 处理所有怪物目标的尸体创建/清除
+	for t in final_targets:
+		var m_idx := monsters.find(t)
+		if m_idx >= 0:
+			_handle_monster_damage_aftermath(m_idx)
+	
 	# 3. 放大 + 特效 + 数字持续 ATTACK_ZOOM_DURATION 秒
 	await get_tree().create_timer(ATTACK_ZOOM_DURATION).timeout
 	
-	# 缩小回正常
-	_zoom_attack_scene(heroes[current_actor["index"]], final_targets, false)
+	# 缩小回正常（过滤掉已被清除的尸体）
+	var remaining: Array[Dictionary] = []
+	for t in final_targets:
+		if monsters.find(t) >= 0:
+			remaining.append(t)
+	if remaining.is_empty():
+		_zoom_combatant(heroes[current_actor["index"]], false)
+	else:
+		_zoom_attack_scene(heroes[current_actor["index"]], remaining, false)
 	
 	# 4. 特效演完，释放锁定并清理已选技能
 	_in_fx_pause = false
@@ -860,6 +1078,12 @@ func _on_ally_pressed(index: int) -> void:
 		ally_snaps.append(_snap_unit(h))
 	ActionResolver.resolve_on_target(heroes[current_actor["index"]], skill_data, heroes[index], heroes)
 	_emit_feedback(heroes, ally_snaps)
+	
+	# 治疗可能让濒死英雄脱离死亡之门
+	_handle_hero_damage_aftermath(index)
+	for i in range(heroes.size()):
+		if i != index:
+			_handle_hero_damage_aftermath(i)
 	
 	# 3. 放大 + 特效 + 数字/图标持续 ATTACK_ZOOM_DURATION 秒
 	await get_tree().create_timer(ATTACK_ZOOM_DURATION).timeout
@@ -1214,7 +1438,8 @@ func _make_hero_slot(hero: Dictionary, idx: int, target_type: String, target_pos
 	slot.add_child(vbox)
 
 	var is_current: bool = (current_actor.get("unit_type") == "hero" and current_actor.get("index") == idx)
-	var is_dead: bool = hero["hp"] <= 0
+	var is_death_door: bool = hero.get("is_death_door", false)
+	var is_dead: bool = hero["hp"] <= 0 and not is_death_door
 	var is_target: bool = (hero_skill_selected and target_type == "single_ally" and not is_dead and not battle_over
 		and (target_positions.is_empty() or (idx + 1) in target_positions))
 	var is_repos_target: bool = (reposition_mode and not is_current and not is_dead and not battle_over)
@@ -1296,6 +1521,15 @@ func _make_hero_slot(hero: Dictionary, idx: int, target_type: String, target_pos
 	stress_lbl.add_theme_color_override("font_color", Color(0.9, 0.4, 0.9, 1))
 	vbox.add_child(stress_lbl)
 
+	# 濒死状态指示器
+	if is_death_door:
+		var dd_lbl := Label.new()
+		dd_lbl.text = "☠ DEATH'S DOOR ☠"
+		dd_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		dd_lbl.add_theme_font_size_override("font_size", 10)
+		dd_lbl.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2, 1))
+		vbox.add_child(dd_lbl)
+
 	# 选中指示器
 	var sel_lbl := Label.new()
 	sel_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1349,7 +1583,8 @@ func _make_monster_slot(monster: Dictionary, idx: int, target_type: String, targ
 	slot.add_child(vbox)
 
 	var is_current: bool = (current_actor.get("unit_type") == "monster" and current_actor.get("index") == idx)
-	var is_dead: bool = monster["hp"] <= 0
+	var is_corpse: bool = monster.get("is_corpse", false)
+	var is_dead: bool = monster["hp"] <= 0 and not is_corpse
 	var is_target: bool = (hero_skill_selected and target_type == "single_enemy" and not is_dead and not battle_over
 		and (target_positions.is_empty() or (idx + 1) in target_positions))
 
@@ -1388,21 +1623,33 @@ func _make_monster_slot(monster: Dictionary, idx: int, target_type: String, targ
 		name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		vbox.add_child(name_lbl)
 
-	# 血条
+	# 血条（尸体显示10点生命上限）
 	var hp_bar := ProgressBar.new()
 	hp_bar.custom_minimum_size = Vector2(100.0, 14.0)
 	hp_bar.min_value = 0
-	hp_bar.max_value = monster["max_hp"]
+	hp_bar.max_value = 10 if is_corpse else monster["max_hp"]
 	hp_bar.value = monster["hp"]
 	hp_bar.show_percentage = false
 	vbox.add_child(hp_bar)
 
 	# HP 数值
 	var hp_lbl := Label.new()
-	hp_lbl.text = "%d/%d" % [monster["hp"], monster["max_hp"]]
+	if is_corpse:
+		hp_lbl.text = "Corpse: %d/10" % monster["hp"]
+	else:
+		hp_lbl.text = "%d/%d" % [monster["hp"], monster["max_hp"]]
 	hp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hp_lbl.add_theme_font_size_override("font_size", 11)
 	vbox.add_child(hp_lbl)
+
+	# 尸体状态指示器
+	if is_corpse:
+		var corpse_lbl := Label.new()
+		corpse_lbl.text = "☠ CORPSE ☠"
+		corpse_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		corpse_lbl.add_theme_font_size_override("font_size", 10)
+		corpse_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6, 1))
+		vbox.add_child(corpse_lbl)
 
 	# 选中指示器
 	var sel_lbl := Label.new()
@@ -1597,6 +1844,31 @@ func _play_fx_at_position(global_pos: Vector2, skel_path: String, atlas_path: St
 	print("[FX] Duration set to: ", duration)
 	
 	# 倒计时结束后优雅地删除特效节点
+	get_tree().create_timer(duration).timeout.connect(func():
+		if is_instance_valid(fx_sp):
+			fx_sp.queue_free()
+	)
+
+# 在指定位置播放共享 death_medium 死亡特效（覆盖在角色之上，不改变角色自身动画）
+func _play_death_fx_at(pos: Vector2) -> void:
+	var skel_path := DEATH_MEDIUM_BASE + ".skel"
+	var atlas_path := DEATH_MEDIUM_BASE + ".atlas"
+	if not FileAccess.file_exists(skel_path) or not FileAccess.file_exists(atlas_path):
+		push_warning("[DeathFX] death_medium files not found")
+		return
+	
+	var fx_sp := SpinePlayer.new()
+	add_child(fx_sp)
+	fx_sp.global_position = pos
+	fx_sp.z_index = 30 # 高于角色和普通特效
+	fx_sp.scale = Vector2(0.6, 0.6)
+	fx_sp.load_character(skel_path, atlas_path, DEATH_MEDIUM_PNG_DIR)
+	
+	var anims: Array = fx_sp.skel_data.get("animations", [])
+	if not anims.is_empty():
+		fx_sp.play(anims[0].name, false)
+	
+	var duration: float = fx_sp.current_anim.duration if (fx_sp.current_anim and fx_sp.current_anim.duration > 0.1) else 1.0
 	get_tree().create_timer(duration).timeout.connect(func():
 		if is_instance_valid(fx_sp):
 			fx_sp.queue_free()
@@ -1872,12 +2144,14 @@ func _update_crusader_animations() -> void:
 			continue
 		var hero := heroes[i]
 		var is_current: bool = (current_actor.get("unit_type") == "hero" and current_actor.get("index") == i)
-		if hero["hp"] <= 0:
-			_load_hero_anim(i, "combat") # 倒地/受伤状态用 combat
+		if hero.get("is_death_door", false):
+			_load_hero_anim(i, "combat") # 濒死状态用 combat（痛苦挣扎姿态）
+		elif hero["hp"] <= 0:
+			# 理论上英雄 HP<=0 且非濒死代表已真死移除，但保留此分支为安全兜底
+			_load_hero_anim(i, "combat")
 		elif hero.get("is_defending", false):
 			_load_hero_anim(i, "defend")
 		elif is_current and _in_fx_pause:
-			# 优先获取当前正在释放的技能在 SKILL_FX_MAP 中配置的个性化动作（如圣矛对应的 attack_charge、切开静脉对应的 attack2）
 			var next_state := "attack"
 			if hero_current_skill != "" and SKILL_FX_MAP.has(hero_current_skill):
 				var fx_cfg = SKILL_FX_MAP[hero_current_skill]
@@ -1885,7 +2159,6 @@ func _update_crusader_animations() -> void:
 					next_state = fx_cfg["caster_anim"]
 			_load_hero_anim(i, next_state)
 		elif is_current:
-			# 选择技能期间以及待机期间，都继续保持战斗或备战待机姿态 (combat) 
 			_load_hero_anim(i, "combat")
 		else:
 			_load_hero_anim(i, "idle")
@@ -1898,12 +2171,13 @@ func _update_monster_animations() -> void:
 			continue
 		var monster := monsters[i]
 		var is_current: bool = (current_actor.get("unit_type") == "monster" and current_actor.get("index") == i)
-		if monster["hp"] <= 0:
-			_load_monster_anim(i, "combat") # 倒地/受伤状态用 combat
+		if monster.get("is_corpse", false):
+			_load_monster_anim(i, "dead") # 尸体播放 dead 动画
+		elif monster["hp"] <= 0:
+			_load_monster_anim(i, "combat") # 安全兜底
 		elif monster.get("is_defending", false):
 			_load_monster_anim(i, "defend")
 		elif is_current and _in_fx_pause:
-			# 优先获取当前正在释放的技能在 SKILL_FX_MAP 中配置的个性化动作（如 cutthroat_strike 对应的 attack_lunge）
 			var next_state := "attack"
 			if monster_current_skill_id != "" and SKILL_FX_MAP.has(monster_current_skill_id):
 				var fx_cfg = SKILL_FX_MAP[monster_current_skill_id]
@@ -2240,26 +2514,52 @@ func _execute_llm_inspiration(input_text: String) -> void:
 	# 面临的敌人总数
 	var enemy_count = _count_alive(monsters)
 	
-	# 4. 彻底解算并降低当前角色的压力值 30，并不超过 0-200 限制
+	# 记录激励前的压力值（用于后续显示）
 	var old_stress = hero.get("stress", 0)
-	hero["stress"] = max(0, old_stress - 30)
 	
-	# 3. 异步向模型发出请求 (在降低压力后立刻执行回复网络/Mock请求)
+	# 异步向模型发出请求（返回 {"reply": String, "sentiment": int}）
 	print("[LLM] Requesting reply for hero: ", hero["name"], " personality: ", personality)
-	var reply_str = await llm_client.get_hero_reply(
+	var result = await llm_client.get_hero_reply(
 		hero["name"],
 		personality,
 		input_text,
 		hero["hp"],
 		hero["max_hp"],
-		hero["stress"],
+		old_stress,
 		enemy_count,
 		self
 	)
 	
-	print("[LLM] Received reply: ", reply_str)
+	var reply_str: String = result.get("reply", "\u201c......\u201d")
+	var sentiment: int = result.get("sentiment", LLMClient.Sentiment.NEUTRAL)
+	print("[LLM] Received reply: ", reply_str, " sentiment: ", sentiment)
 	
-	# 5. 更新受击特效 (播放 target_fx 代表压力降落神光洗礼)
+	# 根据情感极性施加不同的精神压力效果
+	var stress_delta: int
+	var status_text: String
+	match sentiment:
+		LLMClient.Sentiment.POSITIVE:
+			stress_delta = -35
+			status_text = "★ 振奋鼓舞：精神压力从 %d 降至 %d！（正面回应）★"
+		LLMClient.Sentiment.NEUTRAL:
+			stress_delta = -15
+			status_text = "◇ 平淡接受：精神压力从 %d 降至 %d（中性回应）◇"
+		LLMClient.Sentiment.NEGATIVE:
+			stress_delta = 15
+			status_text = "☠ 动摇恐惧：精神压力从 %d 升至 %d！（负面回应）☠"
+		_:
+			stress_delta = -15
+			status_text = "◇ 精神压力从 %d 调整为 %d ◇"
+	
+	hero["stress"] = clamp(old_stress + stress_delta, 0, 200)
+	
+	# 根据情感极性显示对应的压力光环图标
+	if sentiment == LLMClient.Sentiment.POSITIVE:
+		_show_stress_seal(hero, true) # heroic 图标
+	elif sentiment == LLMClient.Sentiment.NEGATIVE:
+		_show_stress_seal(hero, false) # affliction 图标
+	
+	# 播放 target_fx 特效（正面/中性播放神光，负面播放暗影）
 	if SKILL_FX_MAP.has("battle_cry") and SKILL_FX_MAP["battle_cry"].has("target_fx"):
 		var target_fx_base = SKILL_FX_MAP["battle_cry"]["target_fx"]
 		var target_skel = target_fx_base + ".skel"
@@ -2275,12 +2575,12 @@ func _execute_llm_inspiration(input_text: String) -> void:
 	if reply_modal and reply_title_lbl and reply_text_lbl and reply_status_lbl:
 		reply_title_lbl.text = "【%s】回应了领主的指引：" % hero["name"]
 		reply_text_lbl.text = reply_str
-		reply_status_lbl.text = "★ 圣光鼓舞：精神压力从 %d 降至 %d！行动已终了 ★" % [old_stress, hero["stress"]]
+		reply_status_lbl.text = status_text % [old_stress, hero["stress"]]
 		
 	# 刷新血量及压力条本身，让效果落地
 	_update_ui()
 	
-	# 7. 停留 2.5 秒后自行散去，恢复角色正常 idle，并顺利销毁
+	# 停留 2.5 秒后自行散去，恢复角色正常 idle
 	await get_tree().create_timer(2.5).timeout
 	
 	if reply_modal:

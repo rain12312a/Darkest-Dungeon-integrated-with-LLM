@@ -1,86 +1,156 @@
-# darkdungeon
+# Dark Dungeon · 暗黑地牢风格战斗原型
 
-A Godot 4.6 turn-based RPG battle system with custom Spine 2.1.27 animation runtime, inspired by Darkest Dungeon.
+基于 **Godot 4.6** 的回合制战斗原型：自研 **Spine 2.1.27** 骨骼动画运行时、**LLM 驱动的英雄激励喊话**，以及随机生成的地牢地图。
 
-## Features
+> **游戏流程**：`Start`（闪屏 → 主菜单）→ `Map`（随机地牢，逐房探索）→ `Battle`（回合制战斗）→ 胜利返回 `Map` / 击败首领通关返回 `Start`
 
-- ✨ **Turn-based Combat**: Speed-based action queue system
-- 🦴 **Spine Animation Runtime**: Custom parser for Spine 2.1.27 skeletal animation (Region, Mesh, SkinnedMesh attachments)
-- 🎮 **Dynamic UI**: Runtime-generated skill buttons, HP bars, target selection
-- 🎨 **Asymmetric Layout**: Heroes on left, monsters on right with complete symmetry
-- ⚙️ **Data-Driven Design**: Configuration via GDScript static classes
-- 🎯 **Multiple Skill Types**: Single-target, AoE, heal, buff/debuff
+## 亮点 Features
 
-## Quick Start
+- 🧠 **LLM 英雄激励喊话**：向当前行动的英雄喊话，模型结合战况（血量 / 压力）与**你原话的语气**判定四种结果 —— ① 减压 ② 攻击增益 ③ 加压 ④ 精神崩溃、倒戈攻击队友。未配置 API Key 时自动降级为**离线 Mock**（同一套权重逻辑，离线也能完整游玩）
+- 🦴 **自研 Spine 运行时**（纯 GDScript，**不需要**官方 Spine 插件）：解析 `.skel` / `.atlas`，支持 Region / Mesh / SkinnedMesh 附件，逐顶点按骨骼权重蒙皮（Polygon2D）
+- ⚔️ **回合制战斗**：速度浮动 + 行动队列驱动；4 名英雄（十字军 / 强盗 / 神秘学者 / 训犬师）对抗骷髅军团与「门前恶狼」首领战
+- 🩸 **暗黑地牢核心机制**：死门（Death's Door）、压力 / 折磨 / 美德、DoT（流血 / 腐蚀）、晕眩、标记、守护、消耗品、战利品结算
+- 🗺️ **随机地牢地图**：小 / 中 / 大三级（5×5 / 7×7 / 9×9），扩散倾向可调，**当前房间永远居中**
+- 🔊 **音频系统**：BGM 交叉淡入淡出（前奏 → 循环）+ 技能 / 命中 / UI 音效轮转池（素材从 FMOD bank 提取）
+- ⚙️ **数据驱动**：新增英雄 / 怪物 / 技能 / 状态只需改配置表，不必改战斗逻辑
 
-1. **Open Project**: Launch in Godot 4.6 (Vulkan renderer recommended)
-2. **Play**: Press F5 or the Play button to run `scenes/main/Main.tscn`
-3. **Explore**: 
-   - Start Screen → Team Selection → Battle
-   - Select heroes → Click Battle → Watch the fight
+## 快速开始 Quick Start
 
-## Documentation
+### 环境要求
 
-- **[PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md)** — Detailed system architecture and API reference
-- **[TECH_GUIDE.md](TECH_GUIDE.md)** ⭐ — **Complete guide to adding heroes, monsters, UI, and animations**
+- Godot **4.6**（推荐 Vulkan Forward+ 渲染器）
+- 无第三方插件、无需编译
 
-## Project Structure
+### 运行
+
+1. 用 Godot 打开本目录（含 `project.godot`）
+2. 首次运行前先导入资源（仓库忽略了 `*.import`，见下文「关于 `.import`」）
+3. 按 `F5` 运行，主场景 `scenes/main/Main.tscn`
+
+### 战斗内操作
+
+| 操作 | 说明 |
+| --- | --- |
+| 选择目标 | 点击敌方 / 友方卡槽（可选范围由技能的 `target_type` 决定） |
+| 释放技能 | 点击技能按钮；图标与描述由 `SkillConfig` 驱动 |
+| 激励喊话 | 点 `Inspire` → 输入一句话 → LLM 判定（3.5 秒超时自动降级 Mock）→ 点「确定」结算并推进回合 |
+| 使用消耗品 | 食物（回血 2）/ 绷带（解除流血）/ 狗粮（伤害 +20%，持续 1 回合），**不占行动次数** |
+| 战后结算 | 胜利时右侧战利品面板结算补给，确认后回到地图 |
+
+### 可选：启用在线 LLM
+
+`scripts/battle/api_config.gd` 已被 `.gitignore` 排除，克隆后自行创建：
+
+```gdscript
+const API_KEY := ""  # 留空 = 使用离线 Mock 引擎
+const API_URL := "https://api.deepseek.com/v1/chat/completions"
+const MODEL := "deepseek-chat"
+```
+
+> ⚠️ 请勿把真实 API Key 提交进仓库（该文件默认忽略，历史中亦无泄漏记录）。
+
+## 关于 `.import` 与首次导入
+
+`.godot/`、`*.import`、`*.uid`、`export_presets.cfg`、`*.bank`、`*.py` 均在 `.gitignore` 内（项目约定，不入库）。克隆后资源需要重新导入：
+
+```bash
+godot --headless --path . --import
+```
+
+> **音频素材说明**：仓库只保留**提取后**的 `audio/bgm/*.ogg` 与 `audio/sfx/*.ogg`（约 8.5MB）。原版 FMOD bank（600MB+，RIFF 容器内的 FSB5，Godot 无法直接播放）已移除。若要重新提取，需自备游戏原始的 `.bank` 文件，并使用 `tools/extract_fmod_bank.py`（`*.py` 同样不入库）。
+
+## 文档 Documentation
+
+- **[TECH_GUIDE.md](TECH_GUIDE.md)** ⭐ — **如何添加英雄 / 怪物 / 技能 / UI / 动画**，含全部字段说明与踩坑清单
+- **[PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md)** — 系统架构、逐函数说明与核心机制设计
+- **[MONSTER_IMPORT_GUIDE.md](MONSTER_IMPORT_GUIDE.md)** — 怪物素材导入与接线 6 步流程
+- **[CHECKLIST.md](CHECKLIST.md)** — 添加英雄 / 怪物的勾选式快速清单
+
+## 项目结构 Project Structure
 
 ```
 darkdungeon/
-├── characters/              # Hero sprites and animations (Spine format)
-│   ├── crusader/           # Hero 1: Crusader
-│   ├── highwayman/         # Hero 2: Highwayman
-│   └── [new_hero]/         # Add new heroes here
+├── scenes/                   # 场景（.tscn）
+│   ├── main/Main.tscn        # 启动入口（仅负责加载 Start）
+│   ├── start/Start.tscn      # 闪屏 + 主菜单（全代码构建 UI）
+│   ├── map/Map.tscn          # 随机地牢地图
+│   ├── battle/Battle.tscn    # 战斗场景
+│   └── test/SpineTest.tscn   # Spine 解析单测场景
 │
-├── monsters/               # Monster sprites and animations
-│   ├── brigand_cutthroat/  # Monster 1: Cutthroat
-│   └── [new_monster]/      # Add new monsters here
+├── scripts/
+│   ├── battle/               # BattleController / TurnQueue / ActionResolver / LLMClient
+│   │   └── spine/            # SpineAtlas / SpineSkel / SpinePlayer（自研运行时）
+│   ├── data/                 # 配置表：Hero / Skill / Monster / Status / Stress / Consumable
+│   ├── core/                 # BgmManager / SfxManager（Autoload）、GameState、Database
+│   ├── map/                  # DungeonMap（地图生成）+ MapController（地图 UI）
+│   └── main/                 # StartController
 │
-├── scenes/                 # Godot scene files (.tscn)
-│   ├── battle/Battle.tscn  # Main battle scene
-│   ├── main/Main.tscn      # Scene manager
-│   └── ...
+├── characters/               # 英雄素材（Spine：.skel/.atlas/.png + 技能图标 + 头像）
+│   ├── crusader/  highwayman/  occultist/  houndmaster/
 │
-├── scripts/                # GDScript code
-│   ├── battle/             # Battle system (BattleController, Spine renderer)
-│   ├── data/               # Config (HeroConfig, SkillConfig, MonsterConfig)
-│   └── core/               # Core (GameState, Database)
+├── monsters/                 # 怪物素材（骨架 + 特效）
+│   ├── brigand_cutthroat/  skeleton_*/  brigand_sapper|barrel|fuseman|cannon/
 │
-├── data/                   # JSON data (optional, currently using GDScript configs)
+├── audio/                    # bgm/ + sfx/（提取后的 ogg）+ 原版 load_order json
+├── overlays/  panels/  crypts/  fe_flow/  assets/   # 图标 / 面板 / 场景图 / 前端素材
+├── tools/                    # 无头验证探针（_probe_*.gd）与截图脚本（_shot_*.gd）
 │
-└── [documentation files]
-    ├── PROJECT_DOCUMENTATION.md
-    └── TECH_GUIDE.md
+└── *.md                      # 文档（见上）
 ```
 
-## How to Add Content
+## 内容配置 Data-Driven Configs
 
-### Add a New Hero
+| 配置 | 内容 |
+| --- | --- |
+| `HeroConfig.gd` | 4 名英雄：Crusader(50/17/4)、Highwayman(40/20/5)、Occultist(30/25/3)、Houndmaster(45/18/4)；含死门概率与 LLM 人格设定 |
+| `MonsterConfig.gd` | 11 种敌人：Cutthroat、骷髅 6 种（Bone Soldier/Defender/Arbalist/Courtier/Militia/Spearman）、首领战 4 单位（Vvulf / 弹药桶 / 点火员 / 大炮），支持 `inert`、`life_link` |
+| `SkillConfig.gd` | 全部英雄 / 怪物技能：`target_type`、`use_positions`、`effect_type`（damage / heal / guard / composite_heal / apply_status / summon）、`status_effects`、`target_move_forward`、`skill_priority`、使用条件（`requires_*`） |
+| `StatusConfig.gd` | 状态表：bleed / blight / stun / mark / guard / bomb_mark / cannon_loaded / afflicted / virtuous / virtue_buff / inspired / dogfood_buff |
+| `StressConfig.gd` | 压力系统数值：上限 200、折磨阈值 100、折磨 75% / 美德 25%、失控概率与行为参数 |
+| `ConsumableConfig.gd` | 消耗品与背包：食物（回血）/ 绷带（治愈流血）/ 狗粮（伤害增益） |
+| `DungeonMap.gd` | 地图尺寸（`set_size`）、扩散倾向（`set_branchiness`）、遭遇池 `ENCOUNTER_POOL`、首领编队 `BOSS_ENCOUNTER` |
 
-See [TECH_GUIDE.md → Section 2](TECH_GUIDE.md#2-添加新英雄) for detailed steps:
+## 系统总览 Key Systems
 
-1. Create `characters/new_hero/anim/` with Spine animation files
-2. Add hero template to `HeroConfig.HEROES`
-3. Add skills to `SkillConfig.SKILLS`
-4. Add animation mapping in `BattleController.gd`
+### 战斗流程
 
-### Add a New Monster
+```
+回合开始（重掷速度浮动）→ 按有效速度构建行动队列 →
+  英雄回合 → 选择技能 → 选择目标 → 结算伤害/治疗/状态 →（可选）使用消耗品 / 激励喊话 →
+  怪物回合 → 按条件筛选技能 → 自动选目标 → 结算 →
+队列耗尽 → 下一回合（或胜利 / 战败）
+```
 
-See [TECH_GUIDE.md → Section 3](TECH_GUIDE.md#3-添加新怪物) for detailed steps:
+### 核心机制
 
-1. Create `monsters/new_monster/anim/` with Spine animation files
-2. Add monster template to `MonsterConfig.MONSTERS`
-3. Add to encounter list in `MonsterConfig.CURRENT_ENCOUNTER`
-4. Add animation mapping in `BattleController.gd`
+- **速度与队列**：基础速度固定，每回合叠加浮动值后排序；每单位每回合行动 1 次
+- **死门**：HP 归零不立即死亡，进入濒死；濒死期间**受到伤害**时按其 `death_blow_chance` 掷骰（治疗等非伤害结算不掷骰）
+- **压力**：越阈后 75% 折磨 / 25% 美德；折磨者行动时有 30% 概率失控（跳过 / 攻击队友 / 全队加压 / 随机行动）
+- **状态结算时机**：全部挂在**携带者自己行动开始时**（`_tick_current_actor_statuses`），回合开始不结算
+- **伤害公式**：`int(攻击力 × 攻击加算乘区 × attack_ratio × 伤害乘算乘区)`（如 `inspired` 与 `virtue_buff` 加算 = ×1.4，`dogfood_buff` 乘算）
+- **首领战**：投弹 → 次回合引爆、哑弹解除、大炮装填 / 开火 / 召唤、生命链接（弹药桶随首领阵亡、点火员随大炮阵亡）
 
-### Add a New Skill
+### Spine 动画系统
 
-See [TECH_GUIDE.md → Section 6](TECH_GUIDE.md#6-技能系统与按钮绑定) for detailed steps:
+- `SpineAtlas.gd` — 解析 `.atlas` 纹理区域
+- `SpineSkel.gd` — 解析 `.skel` 二进制（骨骼 / 插槽 / 附件 / 网格 / 动画 / IK 约束）
+- `SpinePlayer.gd` — 以 Sprite2D（Region 附件）+ Polygon2D（Mesh / SkinnedMesh）渲染，并播放动画
 
-1. Define skill in `SkillConfig.SKILLS`
-2. Assign to hero's skills array in `HeroConfig.HEROES`
-3. Prepare skill icon: `characters/{hero_id}/{hero_id}.ability.{number}.png`
+### 地图 / 音频 / LLM
+
+- `DungeonMap.gd` + `MapController.gd` — 随机生成房间并绘制走廊，仅相邻且非当前房间可点，已清除房间不再刷怪，Boss 房胜利即通关
+- `BgmManager.gd`（Autoload `Bgm`）— 双播放器交叉淡入淡出 +「前奏 → 循环」两段式曲目
+- `SfxManager.gd`（Autoload `Sfx`）— 技能 / 命中 / UI 音效，多播放器轮转 + 音高音量随机
+- `LLMClient.gd` — DeepSeek Chat API（3.5 秒超时降级）+ 离线 Mock 引擎 + 玩家语气打分（`evaluate_input_tone`）
+
+## 验证探针 Probes
+
+仓库内 `tools/_probe_*.gd` 是无头断言脚本，覆盖死门、压力、BOSS 战、战利品、地图居中、BGM / SFX、Spine 解析完整性等；`tools/_shot_*.gd` 用于渲染截图人工复核。
+
+```bash
+godot --headless --path . --script tools/_probe_stress.gd     # 打印 PASS/FAIL 统计
+godot --headless --path . --script tools/_probe_skel_integrity.gd  # 全量 .skel 体检
+```
 
 ## Technology
 
@@ -89,43 +159,22 @@ See [TECH_GUIDE.md → Section 6](TECH_GUIDE.md#6-技能系统与按钮绑定) f
 | **Engine** | Godot 4.6 |
 | **Language** | GDScript |
 | **Rendering** | Vulkan Forward+ |
-| **Animation** | Custom Spine 2.1.27 runtime |
-| **UI System** | Dynamic GDScript-generated nodes |
-
-## Key Systems
-
-### Battle Flow
-
-```
-Round Start → Build Turn Queue (by speed) → 
-  Hero Turn → Select Skill → Select Target → Execute Damage/Heal →
-  Monster Turn → Auto Attack →
-Back to Round Start (or Victory/Defeat)
-```
-
-### Data Configuration
-
-- **HeroConfig.gd** — Hero stats, skills, capabilities
-- **MonsterConfig.gd** — Monster templates, encounter setup
-- **SkillConfig.gd** — Skill definitions and effects
-
-### Spine Animation System
-
-- **SpineAtlas.gd** — Parse `.atlas` texture regions
-- **SpineSkel.gd** — Parse `.skel` binary bones, slots, attachments, animations
-- **SpinePlayer.gd** — Render as Sprite2D/Polygon2D hierarchy
+| **Animation** | 自研 Spine 2.1.27 运行时（无需官方插件） |
+| **UI System** | 运行时由 GDScript 动态构建（无需手工搭场景） |
+| **LLM** | DeepSeek Chat API，可离线 Mock 降级 |
+| **Audio** | 原版 FMOD bank 提取为 OGG（BGM 交叉淡化 / 音效轮转池） |
 
 ## Notes
 
-- Uses placeholder Darkest Dungeon assets for demonstration
-- Custom Spine runtime does **not** require the official Spine Godot plugin
-- All UI is dynamically generated at runtime (no manual scene construction needed)
-- Performance optimized: caching, minimal state updates
+- 美术与音频素材取自 *Darkest Dungeon*，版权归 **Red Hook Studios** 所有，本项目**仅供学习与研究**，请勿用于商业用途
+- 自研 Spine 运行时**不依赖**官方 Spine Godot 插件
+- 全部 UI 在运行时动态生成，无需手工构建节点
+- 项目开启了「警告即错误」，从 Variant 推断类型（`clamp()` / `Dictionary.get()` 等）必须显式标注类型
+- 无头探针环境下没有真实渲染（视口尺寸可能只有 64px），动画断言需按时间而非帧数
 
 ## Getting Help
 
-Refer to [TECH_GUIDE.md](TECH_GUIDE.md) for:
-- Troubleshooting (Section 7)
-- Common errors and fixes
-- Quick reference checklists
-- File location guide
+优先查阅 [TECH_GUIDE.md](TECH_GUIDE.md)：
+- 故障排查与常见报错（Section 7）
+- 快速参考清单
+- 文件位置索引

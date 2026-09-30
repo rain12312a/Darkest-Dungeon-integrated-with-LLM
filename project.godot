@@ -18,6 +18,11 @@ config/name="darkdungeon"
 run/main_scene="res://scenes/main/Main.tscn"
 config/features=PackedStringArray("4.6")
 
+[autoload]
+
+Bgm="*res://scripts/core/BgmManager.gd"
+Sfx="*res://scripts/core/SfxManager.gd"
+
 [display]
 
 window/size/viewport_width=1280

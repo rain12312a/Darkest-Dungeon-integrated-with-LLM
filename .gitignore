@@ -9,6 +9,16 @@ export_presets.cfg
 debug_*.txt
 offset_out.txt
 
+# Python 缓存 / 音频提取用第三方表（仅本地工具需要）
+__pycache__/
+*.pyc
+tools/_vgmstream/
+
+# 原版 FMOD 音源 bank（600MB+，Godot 无法直接播放，已提取为 audio/sfx + audio/bgm）
+audio/master_banks/
+audio/secondary_banks/
+*.bank
+
 # OS
 .DS_Store
 Thumbs.db

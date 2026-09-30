@@ -3,6 +3,9 @@ extends Node
 
 # 怪物模板配置 - 集中管理所有怪物数据
 # speed_delta_base: 每轮重置的速度浮动值（负值让怪物比英雄慢）
+# skills: 该怪物持有的技能 id 列表（按各自 use_positions / 使用条件自动筛选）
+# inert: true 表示惰性单位（如弹药桶）：永不行动，不进入行动队列
+# life_link: 生命链接的怪物 id——该怪物阵亡时，身上带 life_link 指向它的怪物一同倒下
 static var MONSTERS: Dictionary = {
 	"cutthroat": {
 		"id": "cutthroat",
@@ -12,15 +15,6 @@ static var MONSTERS: Dictionary = {
 		"speed": 4,
 		"speed_delta_base": - 1,
 		"skills": ["cutthroat_strike", "temptation"]
-	},
-	"troll": {
-		"id": "troll",
-		"name": "Troll",
-		"max_hp": 60,
-		"attack": 5,
-		"speed": 3,
-		"speed_delta_base": - 2,
-		"skills": ["troll_smash"]
 	},
 	# === 骷髅系怪物 ===
 	"skeleton_arbalist": {
@@ -66,7 +60,7 @@ static var MONSTERS: Dictionary = {
 		"attack": 5,
 		"speed": 4,
 		"speed_delta_base": - 1,
-		"skills": ["militia_slash"]
+		"skills": ["militia_slash", "militia_ranged"]
 	},
 	"skeleton_spear": {
 		"id": "skeleton_spear",
@@ -75,7 +69,55 @@ static var MONSTERS: Dictionary = {
 		"attack": 6,
 		"speed": 5,
 		"speed_delta_base": - 1,
-		"skills": ["spear_thrust"]
+		"skills": ["spear_thrust", "spear_pierce"]
+	},
+	# =========================================================
+	# 门前恶狼 BOSS 战（Brigand 火器小队）
+	# 参考暗黑地牢原版的 Vvulf / 迫击炮（Brigand Pounder）编队设计：
+	#   · 首领：弹药桶在场时投出炸药锁定英雄（下一回合引爆）；
+	#           弹药桶不在场时召回新的弹药桶，或炮击前排
+	#   · 弹药桶：惰性单位，永不行动，血量偏高（摧毁它可解除首领的爆破标记）
+	#   · 点火员：行动时为大炮装填引信（大炮阵亡时一同倒下）
+	#   · 大炮：被装填后行动时向全体英雄开火（高额 AoE）；点火员不在场时召回点火员
+	# =========================================================
+	"brigand_sapper": {
+		"id": "brigand_sapper",
+		"name": "Brigand Vvulf",
+		"max_hp": 80,
+		"attack": 7,
+		"speed": 5,
+		"speed_delta_base": 0,
+		"skills": ["sapper_throw", "sapper_summon", "sapper_barrage"]
+	},
+	"brigand_barrel": {
+		"id": "brigand_barrel",
+		"name": "Brigand Barrel",
+		"max_hp": 50,
+		"attack": 0,
+		"speed": 0,
+		"speed_delta_base": 0,
+		"skills": [],
+		"inert": true, # 惰性：永不行动（仅作为首领的"弹药"存在）
+		"life_link": "brigand_sapper" # 首领阵亡时弹药桶随之损毁
+	},
+	"brigand_fuseman": {
+		"id": "brigand_fuseman",
+		"name": "Brigand Fuseman",
+		"max_hp": 16,
+		"attack": 4,
+		"speed": 3,
+		"speed_delta_base": - 1,
+		"skills": ["fuseman_light_fuse", "fuseman_hot_shot"],
+		"life_link": "brigand_cannon" # 大炮被摧毁时点火员一同倒下
+	},
+	"brigand_cannon": {
+		"id": "brigand_cannon",
+		"name": "Brigand Cannon",
+		"max_hp": 60,
+		"attack": 6,
+		"speed": 2,
+		"speed_delta_base": - 1,
+		"skills": ["cannon_fire", "cannon_summon", "cannon_blast"]
 	},
 }
 

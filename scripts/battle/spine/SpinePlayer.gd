@@ -138,7 +138,7 @@ func _update_pose() -> void:
 	_bone_world.resize(bones.size())
 	for i in range(bones.size()):
 		var bd: SpineSkel.BoneData = bones[i]
-		if bd.parent_index < 0:
+		if bd.parent_index < 0 or bd.parent_index >= _bone_world.size():
 			_bone_world[i] = local_transforms[i]
 		else:
 			var parent_t: Transform2D = _bone_world[bd.parent_index]
@@ -167,7 +167,7 @@ func _update_pose() -> void:
 		sprite.visible = true
 
 		# 骨骼世界变换
-		var bone_t: Transform2D = _bone_world[sd.bone_index]
+		var bone_t: Transform2D = _bone_world[sd.bone_index] if (sd.bone_index >= 0 and sd.bone_index < _bone_world.size()) else Transform2D.IDENTITY
 
 		# 附件变换（与骨骼使用相同的 Godot Y-down 公式）
 		var att_x = ra.x
@@ -204,7 +204,7 @@ func _update_mesh_poly(si: int, poly: Polygon2D, sd: SpineSkel.SlotData, ra: Spi
 
 	if ra.att_type == 2:
 		# Mesh：顶点在插槽骨骼局部空间（Spine Y-up）
-		var bone_t: Transform2D = _bone_world[sd.bone_index]
+		var bone_t: Transform2D = _bone_world[sd.bone_index] if (sd.bone_index >= 0 and sd.bone_index < _bone_world.size()) else Transform2D.IDENTITY
 		var verts: PackedFloat32Array = ra.mesh_vertices
 		var n: int = verts.size() / 2
 		for i in range(n):

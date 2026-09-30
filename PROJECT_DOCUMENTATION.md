@@ -1,4 +1,4 @@
-﻿# Dark Dungeon 项目管理文档
+# Dark Dungeon 项目管理文档
 
 ## 目录
 
@@ -14,8 +14,9 @@
    - [4.6 data/CharacterData.gd](#46-datacharacterdatagd)
    - [4.6 data/SkillData.gd](#46-dataskilldatagd)
    - [4.7 data/StatusData.gd](#47-datastatusdatagd)
+   - [4.7 data/ConsumableConfig.gd](#47-dataconsumableconfiggd)
    - [4.8 main/StartController.gd](#48-mainstartcontrollergd)
-   - [4.9 main/TeamSelectController.gd](#49-mainteamselectcontrollergd)
+   - [4.9 固定编队（原编队选择功能已移除）](#49-固定编队原编队选择功能已移除)
    - [4.10 battle/BattleController.gd](#410-battlebattlecontrollergd)
    - [4.11 battle/TurnQueue.gd](#411-battleturnqueuegd)
    - [4.12 battle/ActionResolver.gd](#412-battleactionresolvergd)
@@ -25,6 +26,8 @@
    - [4.16 battle/spine/SpineAtlas.gd](#416-battlespinespineatlasgd)
    - [4.17 battle/spine/SpineSkel.gd](#417-battlespinespineskelgd)
    - [4.18 battle/spine/SpinePlayer.gd](#418-battlespinespineplayergd)
+   - [4.19 map/DungeonMap.gd](#419-mapdungeonmapgd)
+   - [4.20 map/MapController.gd](#420-mapmapcontrollergd)
 5. [数据文件说明](#5-数据文件说明)
 6. [已知问题与解决方案](#6-已知问题与解决方案)
 7. [核心系统设计](#7-核心系统设计)
@@ -35,7 +38,20 @@
    - [7.5 浮字伤害/治疗数字系统](#75-浮字伤害治疗数字系统)
    - [7.6 压力光环图标系统](#76-压力光环图标系统)
    - [7.7 技能特效映射系统 (SKILL_FX_MAP)](#77-技能特效映射系统-skill_fx_map)
+   - [7.8 消耗品背包系统](#78-消耗品背包系统)
+   - [7.9 技能 / 消耗品悬浮提示系统](#79-技能--消耗品悬浮提示系统)
+   - [7.10 状态异常（Buff / Debuff）系统](#710-状态异常buff--debuff系统)
+   - [7.11 训犬师（Houndmaster）配置](#711-训犬师houndmaster配置)
+   - [7.12 门前恶狼 BOSS 战（Brigand 火器小队）](#712-门前恶狼-boss-战brigand-火器小队)
+   - [7.13 死门（Death's Door / 濒死）机制](#713-死门deaths-door--濒死机制)
+   - [7.14 压力系统：折磨（Affliction）/ 美德（Virtue）](#714-压力系统折磨affliction--美德virtue)
+   - [7.15 怪物尸体视觉与卡槽（补位 / 布局）](#715-怪物尸体视觉与卡槽补位--布局)
+   - [7.16 战斗结算（战利品）步骤](#716-战斗结算战利品步骤)
+   - [7.17 背景音乐（BGM）系统](#717-背景音乐bgm系统)
+   - [7.18 战斗音效（SFX）系统](#718-战斗音效sfx系统)
+   - [7.19 战斗结算界面（胜利 / 远征终结 / 战败）](#719-战斗结算界面胜利--远征终结--战败)
 8. [扩展指南](#8-扩展指南)
+9. [暗黑地牢原版地图系统](#9-暗黑地牢原版地图系统)
 
 ---
 
@@ -59,10 +75,11 @@
 - **6 种骷髅系怪物**：弩手、酒杯、勇士、盾卫、剑士、枪兵，每种配备独立 Spine 动画与技能特效
 - **UI 布局**：英雄和怪物区完全对称，动态锚点跟踪
 - **SkinnedMesh 支持**：多骨骼加权顶点变换，支持复杂角色肢体动画
-- **LLM 大模型激励喊话系统**：支持 OpenAI 标准兼容协议（DeepSeek 等多源大模型），英雄能根据场上形势、血量、精神压力、敌人数量与自身性格，生动回应领主的训示，并同步触发精神抚慰效果
+- **LLM 大模型激励喊话系统**：支持 OpenAI 标准兼容协议（DeepSeek 等多源大模型），英雄能根据场上形势、血量、精神压力、敌人数量与自身性格，生动回应领主的训示，并触发**四种结果之一**（减压 / 增益 / 加压 / 精神崩溃倒戈攻击队友）；喊话会**占用该英雄本回合的行动点**
 - **暗黑地牢风格镜头放大系统**：所有技能释放时攻击方与目标同步放大至 200%，配合 Spine 骨骼特效形成特写镜头
 - **浮字伤害/治疗数字系统**：鲜红伤害数字与翠绿治疗数字在放大状态下弹出并渐隐
 - **压力光环图标系统**：压力上升显示 `seal.affliction.png`，压力下降显示 `seal.heroic.png`，悬挂于角色头顶
+- **暗黑地牢原版地图系统**：小/中/大三级随机生成地图（房间 + 走廊），初始界面选尺寸；已清除房间不刷怪，击败最远 Boss 房通关
 
 ---
 
@@ -85,6 +102,21 @@ darkdungeon/
 │   ├── sfx/                             # 音效文件（暂未使用）
 │   └── ui/                              # UI 界面素材（暂未使用）
 │
+├── audio/                               # 音频素材
+│   ├── secondary_banks/                 # 原版 FMOD Studio 音效库（.bank）
+│   │   ├── music.bank                   #   全部音乐（FADPCM）——64 首曲目
+│   │   ├── ambience.bank                #   环境音（FADPCM）
+│   │   ├── title_screen.bank            #   标题界面 UI 音效（VORBIS）
+│   │   ├── en_*.bank / hero_*.bank      #   怪物 / 英雄音效与语音（VORBIS）
+│   │   └── ...
+│   ├── master_banks/                    # 主库（事件 / 字符串表）
+│   ├── bgm/                             # ★ 从 music.bank 提取出的 BGM（ogg，游戏实际播放）
+│   └── sfx/                             # ★ 技能/UI 音效 91 个 ogg（5.6MB）
+│       ├── char_al_*.ogg                #   英雄技能 + 通用命中层（54 个）
+│       ├── enemy/                       #   怪物技能（31 个）
+│       └── ui/                          #   结算弹窗 / 按钮音（6 个）
+│
+│
 ├── data/                                # JSON 数据文件目录
 │   ├── characters.json                  # 角色静态数据（由 Database.gd 加载）
 │   ├── skills.json                      # 技能静态数据（由 Database.gd 加载）
@@ -93,15 +125,19 @@ darkdungeon/
 │
 ├── scenes/                              # Godot 场景文件目录（.tscn）
 │   ├── main/
-│   │   ├── Main.tscn                    # 根场景，挂载 GameState.gd，作为场景管理容器
-│   │   └── TeamSelect.tscn             # 编队选择场景，挂载 TeamSelectController.gd
+│   │   └── Main.tscn                    # 根场景，挂载 GameState.gd，作为场景管理容器
 │   │
 │   ├── start/
-│   │   └── Start.tscn                   # 游戏开始画面，挂载 StartController.gd
+│   │   └── Start.tscn                   # 游戏开始画面（闪屏 + 主菜单），挂载 StartController.gd
+│   │
+│   ├── fe_flow/                         # 《暗黑地牢》原版前端素材（标题背景/宅邸/流云/按钮/DEMO 图）
 │   │
 │   ├── battle/
 │   │   ├── Battle.tscn                  # 战斗主场景，挂载 BattleController.gd
 │   │   └── TurnQueue.tscn              # 行动队列可视化场景，挂载 TurnQueue.gd（预留）
+│   │
+│   ├── map/
+│   │   └── Map.tscn                     # 地图场景，挂载 MapController.gd
 │   │
 │   ├── town/
 │   │   └── Town.tscn                    # 城镇场景，挂载 TownController.gd（预留）
@@ -132,10 +168,12 @@ darkdungeon/
     │   └── StatusData.gd.uid
     │
     ├── main/
-    │   ├── StartController.gd           # 开始画面的 UI 控制器
-    │   ├── StartController.gd.uid
-    │   ├── TeamSelectController.gd      # 编队选择画面的 UI 控制器（含编队逻辑）
-    │   └── TeamSelectController.gd.uid
+    │   ├── StartController.gd           # 开始界面（闪屏 + 原版风格主菜单 + 固定编队开局）
+    │   └── StartController.gd.uid
+    │
+    ├── map/
+    │   ├── DungeonMap.gd                # 地图静态单例：小/中/大三级随机生成（房间/走廊/遭遇）
+    │   └── MapController.gd             # 地图场景 UI 控制器（房间方块与走廊渲染）
     │
     ├── battle/
     │   ├── BattleController.gd          # 战斗 UI 控制器与输入处理层（委托逻辑给 TurnQueue/ActionResolver）
@@ -172,21 +210,21 @@ darkdungeon/
                       │
 ┌─────────────────────▼────────────────────────────┐
 │  Start.tscn (StartController.gd)                 │
-│  → 显示"Start Battle"按钮                        │
-│  → 玩家点击 → change_scene_to_file(TeamSelect)   │
+│  → 闪屏 demo_splash.png（点击/按键/2.4s 跳过）   │
+│  → 主菜单：辉光 + 宅邸剪影 + 流云 + DEMO 标志   │
+│  → 选择地图尺寸 Small / Medium / Large         │
+│  → 点击 START：写入固定编队 + 重置补给/关卡     │
+│     → change_scene_to_file(Map.tscn)            │
 └─────────────────────┬────────────────────────────┘
-                      │ 点击 Start Battle
+                      │ 保存固定编队并生成地图
 ┌─────────────────────▼────────────────────────────┐
-│  TeamSelect.tscn (TeamSelectController.gd)       │
-│  → 左侧显示 4 个编队槽位                         │
-│  → 右侧显示可用英雄列表                          │
-│  → 玩家点击 Select → 选择槽位                    │
-│  → 玩家点击英雄 → 填入槽位                       │
-│  → 点击 Confirm → 显示确认面板                   │
-│  → 点击 Start Battle → HeroConfig.set_team()     │
-│     → change_scene_to_file(Battle.tscn)          │
+│  Map.tscn (MapController.gd)                     │
+│  → 渲染随机生成的房间 + 走廊                     │
+│  → 点击相邻房间：                                │
+│     已清除 → 直接移动（不刷怪）                  │
+│     未清除 → 掷遭遇 → change_scene(Battle)       │
 └─────────────────────┬────────────────────────────┘
-                      │ 保存编队后跳转
+                      │ 进入房间
 ┌─────────────────────▼────────────────────────────┐
 │  Battle.tscn (BattleController.gd)               │
 │  → _setup_battle(): 初始化英雄和怪物数据          │
@@ -200,9 +238,9 @@ darkdungeon/
 │  → 队列空 → _start_new_round() 开始新轮          │
 │                                                  │
 │  [ 结束条件 ]                                    │
-│  所有怪物死亡 → Victory 面板                     │
-│  所有英雄死亡 → Defeat 面板                      │
-│  → 点击 Back → 返回 Start.tscn                  │
+│  普通胜利 → Return to Map（回到地图继续探索）    │
+│  Boss 房胜利 → Run Complete! → 返回 Start（通关）│
+│  失败 → Back to Start                            │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -347,14 +385,21 @@ darkdungeon/
 
 ```gdscript
 static var HEROES: Dictionary = {
-    "crusader":   { "name": "Crusader",   "max_hp": 50, "attack": 10, "speed": 4,
-                    "skills": ["slash", "heal"] },
-    "highwayman": { "name": "Highwayman", "max_hp": 30, "attack": 12, "speed": 5,
-                    "skills": ["shotgun", "cut"] }
+    "crusader":   { "name": "Crusader",   "max_hp": 50, "attack": 17, "speed": 4,
+                    "skills": ["slash", "heal", "holy spear", "battle_cry"],
+                    "death_blow_chance": 0.5 },
+    "highwayman": { "name": "Highwayman", "max_hp": 40, "attack": 20, "speed": 5,
+                    "skills": ["shotgun", "cut", "Close-range shooting", "pistol_shot"],
+                    "death_blow_chance": 0.5 }
 }
 
-static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", "highwayman"]
+# 死门（Death's Door）默认死亡概率：角色未单独配置时使用
+const DEFAULT_DEATH_BLOW_CHANCE := 0.5
+
+static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "occultist", "crusader"]
 ```
+
+> `death_blow_chance`（0.0~1.0）写在**每个角色自己的条目里**，含义见 §7.13「死门（Death's Door）机制」。
 
 ---
 
@@ -362,7 +407,7 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 - **参数**：`hero_id` — 英雄唯一标识符（如 `"crusader"`）
 - **返回值**：英雄数据的深拷贝 Dictionary；不存在时返回 `{}`
 - **功能**：获取英雄的初始模板，附加两个字段：`id`（英雄 ID）和 `hp`（初始值等于 `max_hp`）
-- **用途**：TeamSelectController 用于显示英雄信息；BattleController 通过 `get_team_heroes()` 间接调用
+- **用途**：`HeroConfig.get_all_hero_ids()` 列出全部英雄 id（数据层/调测用）；BattleController 通过 `get_team_heroes()` 间接调用
 
 ---
 
@@ -370,6 +415,14 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 - **返回值**：按 `CURRENT_TEAM` 顺序排列的英雄模板数组
 - **功能**：根据当前编队配置构建英雄数据列表，供 BattleController 初始化战斗数据
 - **流程**：遍历 `CURRENT_TEAM`，对每个 hero_id 调用 `get_hero_template()`，跳过空字符串和不存在的 ID
+
+---
+
+#### `static get_death_blow_chance(hero_id: String) -> float`
+- **参数**：`hero_id` — 英雄唯一标识符
+- **返回值**：该角色的死门死亡概率（0.0~1.0），已做 `clampf` 夹逼
+- **功能**：读取 `HEROES[hero_id]["death_blow_chance"]`；未配置或角色不存在时回落到 `DEFAULT_DEATH_BLOW_CHANCE`（0.5）
+- **用途**：`BattleController._death_blow_chance_of()` 在 `_setup_battle()` 构建英雄运行时字典时取该值
 
 ---
 
@@ -382,13 +435,13 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 #### `static set_team(team: Array[String]) -> void`
 - **参数**：`team` — 包含 4 个 hero_id 字符串的数组（空位用 `""` 表示）
 - **功能**：更新全局编队配置 `CURRENT_TEAM`
-- **调用方**：`TeamSelectController._on_start_battle_pressed()`
+- **调用方**：`StartController._on_start_pressed()`（写入 `FIXED_TEAM`）
 
 ---
 
 #### `static get_all_hero_ids() -> Array[String]`
-- **返回值**：所有已注册英雄的 ID 列表（如 `["crusader", "bandit"]`）
-- **功能**：提供可用英雄列表，供 TeamSelectController 渲染选英雄 UI
+- **返回值**：所有已注册英雄的 ID 列表（如 `["crusader", "highwayman", "occultist", "houndmaster"]`）
+- **功能**：提供可用英雄 id 列表（供数据层/调测使用；编队选择界面已移除）
 
 ---
 
@@ -429,19 +482,32 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 
 | ID | 名称 | 类型 | 目标 | 效果 | use_positions | target_positions |
 |----|------|------|------|------|--------------|------------------|
-| `cutthroat_strike` | Cutthroat Strike | damage | single_enemy | ATK × 1.0 | [1, 2, 3] | [1, 2] |
-| `temptation` | Temptation | damage | single_enemy | ATK × 0.5, stress+30 | [3, 4] | [1, 2, 3, 4] |
-| `troll_smash` | Troll Smash | damage | single_enemy | ATK × 1.2 | [1, 2] | [1, 2] |
-| `arbalist_crossbow` | Crossbow Shot | damage | single_enemy | ATK × 1.3（后排远程） | [3, 4] | [1, 2, 3, 4] |
-| `arbalist_bayonet` | Bayonet Jab | damage | single_enemy | ATK × 0.7（前排近战） | [1, 2] | [1, 2] |
-| `courtier_goblet` | Goblet Toss | damage | all_enemies | ATK × 0.3, stress+15 | [3, 4] | [1, 2, 3, 4] |
-| `courtier_dagger` | Poisoned Dagger | damage | single_enemy | ATK × 0.6, stress+20 | [1, 2] | [1, 2, 3] |
-| `skeleton_melee` | Rusty Blade | damage | single_enemy | ATK × 1.0 | [1, 2, 3] | [1, 2] |
-| `defender_axe` | Axe Cleave | damage | single_enemy | ATK × 0.8 | [1, 2] | [1, 2] |
-| `defender_shield` | Shield Bash | damage | single_enemy | ATK × 0.5, stress+10 | [1, 2] | [1, 2] |
-| `militia_slash` | Militia Slash | damage | single_enemy | ATK × 1.0 | [1, 2, 3] | [1, 2] |
-| `spear_thrust` | Spear Thrust | damage | single_enemy | ATK × 1.0（穿刺后排） | [1, 2, 3] | [2, 3, 4] |
+| `cutthroat_strike` | Cutthroat Strike | damage | single_enemy | ATK × 0.9~1.1, 流血 2层/3回合 | [1, 2, 3] | [1, 2] |
+| `temptation` | Temptation | damage | all_enemies | ATK × 0.45~0.55, stress+15~25 | [3, 4] | [1, 2, 3, 4] |
+| `arbalist_crossbow` | Crossbow Shot | damage | single_enemy | ATK × 1.2~1.4（后排远程） | [3, 4] | [1, 2, 3, 4] |
+| `arbalist_bayonet` | Bayonet Jab | damage | single_enemy | ATK × 0.6~0.8（前排近战） | [1, 2] | [1, 2] |
+| `courtier_goblet` | Goblet Toss | damage | all_enemies | ATK × 0.25~0.35, stress+35~45 | [3, 4] | [1, 2, 3, 4] |
+| `courtier_dagger` | Poisoned Dagger | damage | single_enemy | ATK × 0.5~0.7 | [1, 2] | [1, 2, 3] |
+| `skeleton_melee` | Rusty Blade | damage | single_enemy | ATK × 0.9~1.1 | [1, 2, 3, 4] | [1, 2] |
+| `defender_axe` | Axe Cleave | damage | single_enemy | ATK × 0.7~0.9 | [1, 2] | [1, 2] |
+| `defender_shield` | Shield Bash | damage | single_enemy | ATK × 0.35~0.45, 晕眩 1 回合 | [1, 2] | [1, 2] |
+| `militia_slash` | Militia Slash | damage | single_enemy | ATK × 0.9~1.1, 流血 3层/3回合 | [1, 2] | [1, 2, 3] |
+| `militia_ranged` | Militia Ranged | damage | single_enemy | ATK × 0.5~0.7（后排远程） | [3, 4] | [1, 2] |
+| `spear_thrust` | Spear Thrust | damage | single_enemy | ATK × 0.9~1.1（穿刺后排） | [1, 2, 3] | [2, 3, 4] |
+| `spear_pierce` | Spear Pierce | damage | all_enemies | ATK × 0.8~1.0（贯穿） | [1, 2, 3] | [1, 2, 3, 4] |
 
+**门前恶狼 BOSS 战技能**（详见 §7.12）：
+
+| ID | 名称 | 类型 | 目标 | 效果 / 使用条件 | use_positions | target_positions |
+|----|------|------|------|------------------|--------------|------------------|
+| `sapper_throw` | Bomb Toss | apply_status | single_enemy | 不给伤害，只挂 `bomb_mark`；需弹药桶存活 | [1, 2, 3, 4] | [1, 2, 3, 4] |
+| `sapper_summon` | Haul in a Barrel | summon | self | 召回 `brigand_barrel`；需弹药桶不在场 | [1, 2, 3, 4] | [1, 2, 3, 4] |
+| `sapper_barrage` | Barrage | damage | all_enemies | ATK × 0.5~0.7 + stress 3~6，只打前两位；需弹药桶不在场 | [1, 2, 3, 4] | [1, 2] |
+| `cannon_fire` | Fire! | damage | all_enemies | ATK × 0.9~1.2 + stress 3~5；需自身 `cannon_loaded`，开火后卸弹 | [1, 2, 3, 4] | [1, 2, 3, 4] |
+| `cannon_summon` | Press Gang | summon | self | 召回 `brigand_fuseman`；需点火员不在场 | [1, 2, 3, 4] | [1, 2, 3, 4] |
+| `cannon_blast` | Scattershot | damage | single_enemy | ATK × 0.6~0.8；需点火员在场且自身未装填 | [1, 2, 3, 4] | [1, 2, 3, 4] |
+| `fuseman_light_fuse` | Light the Fuse | apply_status | single_ally | 给大炮挂 `cannon_loaded`（仅未装填的大炮）；`skill_priority = 1` 保证优先装填 | [1, 2, 3, 4] | [1, 2, 3, 4] |
+| `fuseman_hot_shot` | Hot Shot | damage | single_enemy | ATK × 0.7~0.9（备选攻击） | [1, 2, 3, 4] | [1, 2, 3] |
 ---
 
 #### `static get_skill(skill_id: String) -> Dictionary`
@@ -522,175 +588,120 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 
 ---
 
+### 4.7 data/ConsumableConfig.gd
+
+**类名**：`ConsumableConfig`  
+**类继承**：`extends Node`  
+**职责**：集中管理消耗品（食物 Food / 绷带 Bandage / 狗粮 Dog Food）的静态配置、背包存储与增减逻辑。背包在战斗场景的左下方面板中以 16 格网格渲染，左键点击使用。
+
+**静态变量**：
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| `ITEMS` | Dictionary | 消耗品模板字典，键为 `item_id`。字段：`name`（显示名）、`icon`（图标路径）、`heal`（回复生命值，恢复类）、`cure_status`（要治愈的状态 id 数组，治愈类）、`buff_status` + `buff_duration`（要附加的状态 id 与持续回合数，增益类）、`description`（悬浮提示描述） |
+| `INVENTORY` | Array[Dictionary] | 消耗品背包，最多 16 格；每项 `{"item_id": String, "count": int}`；同种消耗品无限堆叠 |
+| `MAX_SLOTS` | const int | `16`，背包槽位上限 |
+
+**当前消耗品**：
+
+| item_id | name | 效果字段 | 说明 |
+|---------|------|----------|------|
+| `food` | Food | `heal: 2` | 为当前行动的英雄恢复少量生命 |
+| `bandage` | Bandage | `cure_status: ["bleed"]` | 为当前行动的英雄治愈流血 |
+| `dogfood` | Dog Food | `buff_status: "dogfood_buff"`, `buff_duration: 1` | 使当前行动的英雄伤害提高 20%，持续 1 回合 |
+
+**方法**：
+
+| 方法 | 说明 |
+|------|------|
+| `static reset_inventory(initial_food=4, initial_bandage=2, initial_dogfood=2)` | 开新局时清空背包并发放初始补给（食物 + 绷带 + 狗粮） |
+| `static add_item(item_id, amount) -> bool` | 添加消耗品；同种堆叠，新种类占用新格（受 16 格上限约束），失败返回 false |
+| `static get_count(item_id) -> int` | 返回指定消耗品的持有数量 |
+| `static consume_item(item_id, amount=1) -> bool` | 消耗指定数量；数量不足或不存在返回 false |
+| `static get_item(item_id) -> Dictionary` | 返回消耗品模板的深拷贝（不存在返回空字典） |
+
+---
+
 ### 4.8 main/StartController.gd
 
 **类继承**：`extends Node`  
-**挂载场景**：`scenes/start/Start.tscn`  
-**职责**：管理游戏开始画面，响应玩家点击"开始"按钮。
+**挂载场景**：`scenes/start/Start.tscn`（场景文件极简，全部 UI 由代码构建）  
+**职责**：复刻《暗黑地牢》原版前端的游戏开始界面 —— **闪屏 → 主菜单 → 开局**，素材全部取自 `res://fe_flow/`。
 
-**节点引用**（`@onready`）：
+**素材与版式**：
 
-| 变量 | 类型 | 路径 |
-|------|------|------|
-| `start_button` | Button | `$StartUI/StartButton` |
+| 常量 | 值 | 用途 |
+|------|-----|------|
+| `SPLASH_IMAGE` | `fe_flow/demo_splash.png` | 闪屏整图；同时用 `AtlasTexture` 裁出 logo 当标题 |
+| `TITLE_BG_IMAGE` | `fe_flow/title_bg.png` | 1920×2160 的前端背景，取**下半屏**（黑天 + 红色辉光）当底板 |
+| `TITLE_HOUSE_IMAGE` | `fe_flow/title_house.png` | 宅邸黑色剪影（压在辉光之上） |
+| `SKY_FAR_IMAGE` / `SKY_NEAR_IMAGE` | `fe_flow/sky01.png` / `sky02.png` | 两层流云，半透明 + 极缓慢横向漂移 |
+| `BUTTON_ART` | `fe_flow/start_button.png` | 深色描金按钮底图，作为 `StyleBoxTexture` 九宫格用于所有按钮 |
+| `LOGO_REGION` | `Rect2(510,199,962,550)` | `demo_splash` 中 logo 的实测包围盒 |
+| `DESIGN_SIZE` / `PAGE_SCROLL` | `1920×1080` / `1080` | 版式设计尺寸与折算偏移 |
+| `FIXED_TEAM` | `crusader / highwayman / occultist / houndmaster` | 固定初始编队 |
+| `MAP_SIZES` | `small` / `medium` / `large` | 地图尺寸三档 |
+| `SPLASH_DURATION` / `SPLASH_FADE` | `2.4` / `0.45` | 闪屏停留与淡出时长（秒） |
+
+> **坐标来源**：`fe_flow/fe_flow.layout.darkest` 的原始数值是 1920×2160 虚拟空间，主菜单页 = 该空间的下半屏，故「页面内 y = 布局 y − 1080」：宅邸 `1486 → 406`、流云 `1450/1600 → 370/520`、START 按钮中心 `2070 → 990`（左上 944）。整套页面画在 1920×1080 的 `DesignRoot` 上，由 `_layout_design_root()` 按窗口等比缩放并居中。
+> **⚠️ Godot 4 的 `TextureRect` 没有 `region_enabled` / `region_rect`**，裁图要用 `AtlasTexture`（见 `_atlas()`）。
+
+**节点结构**（运行时）：`Start` → `MenuLayer`（黑底 + `DesignRoot`）与 `SplashLayer`。
 
 ---
 
 #### `_ready() -> void`
-- **触发时机**：Start.tscn 加载完成时
-- **功能**：检查 `start_button` 节点是否存在，若存在则将其 `pressed` 信号连接到 `_on_start_pressed()`
+- **功能**：构建菜单 → 监听窗口 `size_changed` → 应用版式缩放；若本次运行尚未播过闪屏，则构建 `SplashLayer` 并 `_play_splash()`
+
+---
+
+#### `_layout_design_root() -> void`
+- **功能**：`DesignRoot.scale = min(vw/1920, vh/1080)` 后居中；窗口尺寸变化时自动重排
+
+---
+
+#### `_build_menu()` 及 `_add_*()`（私有）
+- `_add_title_glow()`：`AtlasTexture(title_bg, Rect2(0,1080,1920,1080))` 铺满设计区
+- `_add_house()`：宅邸剪影放在 `y = 406`（尺寸 1920×674）
+- `_add_clouds()`：`SkyFar` / `SkyNear` 两层流云，`_drift()` 做往返漂移
+- `_add_logo()`：`AtlasTexture(demo_splash, LOGO_REGION)` 居中置于顶部
+- `_add_size_row()`：`SMALL / MEDIUM / LARGE` 三个按钮 + 说明文字（默认 `medium`）
+- `_add_start_button()`：`START` 按钮（372×92，位置沿用布局值）
+- `_add_build_label()`：左下角版本信息（对应原版 `.build_num_pos`）
+- `_style_banner_button()`：把 `start_button.png` 包成 `StyleBoxTexture`（normal / hover / pressed / disabled）
+
+---
+
+#### `_on_size_pressed(size_key: String) -> void`
+- **功能**：记录所选地图尺寸，刷新按钮高亮与说明文字（`_refresh_size_row()`）
+
+---
+
+#### `_input(event)` / `_play_splash()` / `_dismiss_splash()`
+- **功能**：闪屏跳过逻辑 —— 鼠标点击或任意按键立即 `_dismiss_splash()`（0.45s 淡出后 `queue_free`）；否则 `SPLASH_DURATION` 秒后自动跳过
+- **`static var _splash_played`**：只在本次运行**首次**进入开始界面时播放闪屏（失败 / 通关返回 Start 时不再闪）
 
 ---
 
 #### `_on_start_pressed() -> void`
-- **触发时机**：玩家点击"Start Battle"按钮
-- **功能**：切换到编队选择场景
-- **实现**：`get_tree().change_scene_to_file("res://scenes/main/TeamSelect.tscn")`
+- **触发时机**：点击 `START`
+- **功能**：写入固定编队 → 重置队伍状态与补给 → 按所选尺寸重置关卡 → 进入地图
+- **实现**：`HeroConfig.set_team(FIXED_TEAM)` → `HeroConfig.reset_party_state()` → `ConsumableConfig.reset_inventory()` → `DungeonMap.set_size()` + `DungeonMap.reset_run()` → `change_scene_to_file("res://scenes/map/Map.tscn")`
+- **防重**：点击后立即 `disabled = true`
 
 ---
 
-### 4.9 main/TeamSelectController.gd
+### 4.9 固定编队（原编队选择功能已移除）
 
-**类继承**：`extends Node`  
-**挂载场景**：`scenes/main/TeamSelect.tscn`  
-**职责**：管理编队选择画面的全部 UI 逻辑，包括槽位选择、英雄选择、编队确认。
+**编队选择功能已删除**：`scenes/main/TeamSelect.tscn` 与 `scripts/main/TeamSelectController.gd` 均已移除，开局队伍固定为 **十字军 · 强盗 · 神秘学者 · 训犬师**。
 
-**信号**：
+| 位置 | 说明 |
+|------|------|
+| `StartController.FIXED_TEAM` | 固定编队常量 `["crusader","highwayman","occultist","houndmaster"]`，**要改初始编队只需改这里** |
+| `HeroConfig.DEFAULT_TEAM` / `CURRENT_TEAM` | 默认值与运行时队伍，均为同一组合（与 `FIXED_TEAM` 保持一致） |
+| `StartController._on_start_pressed()` | 开新局唯一入口（详见 §4.8） |
 
-| 信号名 | 说明 |
-|--------|------|
-| `team_selected` | 编队确认后发出（当前未使用，预留） |
-
-**成员变量**：
-
-| 变量 | 类型 | 初始值 | 说明 |
-|------|------|--------|------|
-| `hero_slots` | Array[HBoxContainer] | `[]` | 4 个槽位容器节点的引用 |
-| `confirm_button` | Button | null | "Confirm"确认按钮 |
-| `available_heroes_container` | VBoxContainer | null | 可用英雄列表容器 |
-| `confirm_panel` | Panel | null | 编队确认弹出面板 |
-| `team_summary_label` | Label | null | 面板中显示编队摘要的标签 |
-| `start_button` | Button | null | 面板中的"Start Battle"按钮 |
-| `back_button` | Button | null | 面板中的"Back"返回按钮 |
-| `current_team` | Array[String] | `["crusader","highwayman","crusader","highwayman"]` | 当前编队的 hero_id 数组 |
-| `selected_slot` | int | `-1` | 当前处于"等待选择英雄"状态的槽位索引；-1 表示未选中 |
-
----
-
-#### `_ready() -> void`
-- **触发时机**：TeamSelect.tscn 加载完成时
-- **功能**：获取所有 UI 节点引用，初始化 UI，连接按钮信号
-- **流程**：
-  1. 用 `get_node()` 手动获取 4 个槽位（Slot1-Slot4）、确认面板等节点
-  2. 调用 `_setup_ui()`
-  3. 连接 `confirm_button.pressed` → `_on_confirm_pressed()`
-  4. 连接 `start_button.pressed` → `_on_start_battle_pressed()`
-  5. 连接 `back_button.pressed` → `_on_confirm_back_pressed()`
-
----
-
-#### `_setup_ui() -> void`
-- **功能**：初始化整个编队选择界面
-- **流程**：
-  1. 调用 `_update_available_heroes()` 生成右侧英雄列表
-  2. 调用 `_update_team_display()` 渲染当前编队槽位
-
----
-
-#### `_update_available_heroes() -> void`
-- **功能**：清空并重新生成右侧可选英雄列表
-- **流程**：
-  1. 删除 `available_heroes_container` 的所有子节点
-  2. 遍历 `HeroConfig.get_all_hero_ids()`
-  3. 对每个 hero_id：
-     - 调用 `HeroConfig.get_hero_template(hero_id)` 获取数据
-     - 创建 Button，文本为 `"名字 (HP:xx ATK:xx)"`
-     - 设置最小尺寸 `Vector2(300, 40)`
-     - 连接 `pressed` → `_on_hero_selected(hero_id)`
-     - 添加到容器
-
----
-
-#### `_update_team_display() -> void`
-- **功能**：根据 `current_team` 和 `selected_slot` 重新渲染 4 个槽位
-- **对每个槽位 i 的逻辑**：
-  - `current_team[i] != ""`（已有英雄）：
-    - 显示英雄名称 Label
-    - 显示 Remove 按钮，连接到 `_on_slot_remove(i)`
-  - `current_team[i] == ""`（空槽位）且 `selected_slot == i`（当前等待选择）：
-    - 显示黄色 Label `"N. [SELECT HERO] <"`
-    - 显示 Select 按钮（disabled，UI 提示用）
-  - 其他空槽位：
-    - 显示灰色 Label `"N. Empty"`
-    - 显示 Select 按钮，连接到 `_on_slot_select(i)`
-
----
-
-#### `_on_hero_selected(hero_id: String) -> void`
-- **参数**：`hero_id` — 被点击的英雄 ID
-- **触发时机**：玩家点击右侧英雄列表中的某个英雄按钮
-- **功能**：将选中的英雄放入当前激活的槽位
-- **流程**：
-  1. 检查 `selected_slot` 是否在 `[0, 3]` 范围内
-  2. 将 `hero_id` 写入 `current_team[selected_slot]`
-  3. 重置 `selected_slot = -1`
-  4. 调用 `_update_team_display()` 刷新显示
-
----
-
-#### `_on_slot_select(slot_index: int) -> void`
-- **参数**：`slot_index` — 被点击的槽位索引（0-3）
-- **触发时机**：玩家点击某个空槽位的"Select"按钮
-- **功能**：将该槽位设为"待选英雄"状态
-- **流程**：
-  1. 设置 `selected_slot = slot_index`
-  2. 调用 `_update_team_display()`（该槽位会变为黄色提示）
-
----
-
-#### `_on_slot_remove(slot_index: int) -> void`
-- **参数**：`slot_index` — 被操作的槽位索引（0-3）
-- **触发时机**：玩家点击已有英雄的槽位上的"Remove"按钮
-- **功能**：清空该槽位的英雄
-- **流程**：
-  1. 验证 `slot_index` 在有效范围内
-  2. 将 `current_team[slot_index]` 设为 `""`
-  3. 调用 `_update_team_display()`
-
----
-
-#### `_on_confirm_pressed() -> void`
-- **触发时机**：玩家点击"Confirm"按钮
-- **功能**：验证编队有效性后弹出确认面板
-- **流程**：
-  1. 遍历 `current_team`，检查是否至少有一个非空 hero_id
-  2. 若全为空，直接返回（不弹面板）
-  3. 调用 `_show_confirm_panel()`
-
----
-
-#### `_show_confirm_panel() -> void`
-- **功能**：构建编队摘要文本并显示确认面板
-- **流程**：
-  1. 构建字符串，格式为 `"1. 英雄名\n2. 英雄名\n..."` 或 `"N. Empty"`
-  2. 将字符串写入 `team_summary_label.text`
-  3. 设置 `confirm_panel.visible = true`
-
----
-
-#### `_on_start_battle_pressed() -> void`
-- **触发时机**：玩家在确认面板中点击"Start Battle"
-- **功能**：保存编队配置并跳转到战斗场景
-- **流程**：
-  1. 调用 `HeroConfig.set_team(current_team)` 写入全局编队
-  2. 调用 `get_tree().change_scene_to_file("res://scenes/battle/Battle.tscn")`
-
----
-
-#### `_on_confirm_back_pressed() -> void`
-- **触发时机**：玩家在确认面板中点击"Back"
-- **功能**：关闭确认面板，返回编队编辑状态
-- **实现**：`confirm_panel.visible = false`
+> 若要恢复“可选编队”，从 git 历史取回上述两个文件，并把 `_on_start_pressed()` 的跳转改回 `TeamSelect.tscn` 即可。
 
 ---
 
@@ -725,6 +736,7 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 
 | 变量 | 节点路径 | 说明 |
 |------|---------|------|
+| `battle_ui` | `$BattleUI` | 全屏 UI 根容器（Control）；消耗品槽位挂载于此，避免命中测试越界 |
 | `hero_list` | `$BattleUI/BattleContainer/LeftArea/HeroArea` | 英雄信息列表容器 (HBoxContainer) |
 | `monster_list` | `$BattleUI/BattleContainer/RightArea/MonsterArea` | 怪物列表/目标选择容器 (HBoxContainer) |
 | `selected_label` | `$BattleUI/BattleContainer/RightArea/SelectedLabel` | 当前行动状态描述文本 |
@@ -735,6 +747,8 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 | `reposition_button` | `$BattleUI/BattleContainer/LeftArea/BottomLeftPanel/BottomPanelsContainer/PanelHero/ReposButton` | 换位按钮 |
 | `victory_panel` | `$BattleUI/VictoryPanel` | 胜负结果面板 |
 | `back_button` | `$BattleUI/VictoryPanel/BackToStartButton` | 返回开始画面按钮 |
+| `panel_inventory` | `$BattleUI/BattleContainer/LeftArea/BottomLeftPanel/BottomPanelsContainer/PanelInventory` | 消耗品背包面板容器 (Control) |
+| `panel_inventory_bg` | `$BattleUI/BattleContainer/LeftArea/BottomLeftPanel/BottomPanelsContainer/PanelInventory/PanelInventoryBg` | 消耗品背景贴图 (TextureRect)，其全局矩形作为槽位定位基准 |
 | `hero_slots` | 数组[4] | 英雄位置容器 (预设的 Control 节点数组) |
 | `monster_slots` | 数组[4] | 怪物位置容器 (预设的 Control 节点数组) |
 
@@ -754,6 +768,8 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 | `_spine_players` | Dictionary | SpinePlayer 缓存：key=英雄 index(int) 或 `"monster_%d"`，value=SpinePlayer 节点 |
 | `_spine_current_state` | Dictionary | 动画状态缓存：key=索引，value=当前加载的动画名 |
 | `_spine_anchors` | Dictionary | UI 锚点缓存：key=索引，value=ColorRect（用于位置同步） |
+| `_inventory_slots_root` | Control | 消耗品槽位容器（挂载于 `battle_ui`，每次重建时替换） |
+| `_inventory_initialized` | bool | 消耗品背包是否已在首帧构建完成（防止重复构建） |
 
 ---
 
@@ -783,6 +799,7 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
   - 英雄和怪物完全对称，都从各自的 UI 预设位置提取锚点
   - 无动态偏移或计算，位置由场景中的 `hero_slots` / `monster_slots` Control 节点决定
   - 每帧同步确保动画位置始终与 UI 保持一致
+- **首帧构建消耗品背包**：当 `_inventory_initialized == false` 且 `panel_inventory` / `panel_inventory_bg` / `battle_ui` 均有效时，置位标记并调用一次 `_build_inventory_panel()`（放在 `_process` 中而非 `call_deferred`，确保容器布局已稳定后取到的全局矩形准确）
 
 ---
 
@@ -911,6 +928,7 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
      - 调用 `_apply_hero_reposition_position(src_index, target_index)` 执行物理数组顺序移动与 Spine 动画及 UI 锚点映射表重建。
      - 立即调用 `turn_queue.build()` 实现在位移条件下的**重新排队排序**，并调用 `_get_next_actor()` 拉取新状态继续推进。
   4. **常规推进**：若没有发生位移，则直接重置技能选择状态（`hero_skill_selected = false`、`hero_current_skill = ""`），并调用 `_advance_action()` 结束此项回合。
+  5. **目标强制位移的收尾（`target_move_forward`）**：若本回合技能对敌方目标施加了强制位移（`_target_reposition_applied == true`），说明 `monsters` 数组与 Spine 映射已在打击动画结束时重排完毕。此时需与位移分支保持一致：先 `heroes[current_actor["index"]]["actions_remaining"] -= 1` 扣除行动点，再 `turn_queue.build()` 重建行动队列，最后 `_get_next_actor()` 推进。**若在扣点前重建队列，施法者会带着 1 点行动力被重新入队，造成同一回合重复行动**。该标记在函数末尾统一清零，并在 `_setup_battle()` 中重置。
 
 ---
 
@@ -924,6 +942,24 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
      - 如果是向左侧（排头）方向位移，相应地将沿途英雄向右移位；
      - 将原本的 `src_spine` 实例及其播放姿态 `src_state` 赋予目标 `target_idx` 位置。
   4. **变量刷新**：将全局 `current_actor["index"]` 更新为全新 `insert_at` 位置，避免坐标系错乱。
+
+---
+
+#### `_apply_monster_reposition_position(src_idx: int, target_idx: int) -> void`
+- **功能**：怪物版换位矩阵处理器，实现敌方单位在 `monsters` 数组与 `"monster_%d"` Spine 映射中的同步位移，供「拉前/推后」类技能调用
+- **核心逻辑**：
+  1. **边界夹逼**：`clamp(target_idx, 0, monsters.size() - 1)`，同索引直接返回。
+  2. **缓存槽位**：按索引顺序把 `"monster_%d"` 对应的 SpinePlayer 与动画状态取成数组。
+  3. **物理重排**：`monsters.remove_at(src_idx)` + `insert(target_idx, ...)`，并刷新每个怪物的 `index` 键；槽位数组以同样的 `remove_at/insert` 规则重排，保证渲染与数据一一对应。
+  4. **键重建**：仅清除 `"monster_"` 前缀的字符串键，保留英雄的 `int` 键，然后按新顺序写回 `"monster_%d"`。
+  5. **只刷 UI、不建队列**：调用 `_update_ui()` 重建锚点与站位。**行动队列的重建必须延后到行动点扣除之后**（见 `_finish_hero_action`），否则施法者会重复行动。
+
+---
+
+#### `_apply_skill_target_reposition(target_idx: int, skill_data: Dictionary) -> void`
+- **功能**：读取技能 `target_move_forward` 字段，把指定怪物向排头方向拉前（正数）或向排尾方向推后（负数）
+- **规则**：字段为 0 / 已死亡 / 尸体 时直接跳过，避免把尸体拖到排头；实际发生位移时置位 `_target_reposition_applied`。
+- **调用点**：`_on_monster_pressed()` 中，`await ATTACK_ZOOM_DURATION` 与 `_clear_focus()` 之后结算（先演完打击动画，避免视觉瞬移）。
 
 ---
 
@@ -1049,6 +1085,7 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 #### `_update_selected_text() -> void`
 - **功能**：更新 `selected_label` 的状态描述文本
 - **规则**：战斗结束 → Victory/Defeat；技能选择中 → 目标类型提示；待选技能 → "choose skill"；怪物行动 → "attacking..."
+- **越界防护**：访问 `heroes[current_actor["index"]]` / `monsters[current_actor["index"]]` 前先校验 `index` 是否在数组范围内，越界则直接返回（防止单位被移除后下标失效导致 `Out of bounds` 崩溃）
 
 ---
 
@@ -1061,7 +1098,7 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 
 #### `_update_skill_buttons() -> void`
 - **功能**：根据技能选择状态生成技能图标或选择提示
-- **未选技能模式**：显示技能图标（加载 `{hero}.ability.{one|two|...}.png`）
+- **未选技能模式**：显示技能图标（加载 `{hero}.ability.{one|two|...}.png`），并挂载 `_build_skill_tooltip(sd)` 生成的悬浮提示
 - **已选技能模式**：根据 `target_type` 显示提示（"Select Enemy"、"Select Ally" 或 "Attack All"）
 - **取消按钮**：始终显示在第二个技能框
 - **关键优化**：所有按钮信号使用 `CONNECT_DEFERRED`
@@ -1635,9 +1672,27 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 | `_show_floating_number(unit, amount)` | 浮字标签生成+渐隐 tween |
 | `_show_stress_seal(unit, is_heroic)` | 延迟显示压力图标 |
 | `_show_stress_seal_delayed(at_pos, icon_path)` | 实际创建压力图标 TextureRect |
-| `_emit_feedback(targets, snapshots)` | 比对快照差值，路由到浮字/图标 |
+| `_emit_feedback(targets, snapshots)` | 比对快照差值，路由到浮字/图标（含快照长度越界防护） |
 
 **怪物动画加载**（6 个骷髅分支已添加至 `_load_monster_anim` 和 `_create_spine_player_for_monster`）。
+
+**消耗品背包系统**（v3.2）：
+
+| 函数 | 职责 |
+|------|------|
+| `_build_inventory_panel()` | 重建 16 格消耗品槽位容器；挂载到全屏 `battle_ui` 并按 `panel_inventory_bg.get_global_rect()` 定位 |
+| `_add_inventory_slot(root, slot_index, ax0..ay1)` | 创建单个消耗品格子（Button，左键触发），含图标、数量角标与悬浮提示 |
+| `_get_inventory_item_at(slot_index)` | 返回指定槽位的 item_id（越界返回空串） |
+| `_try_use_consumable(slot_index)` | 左键使用消耗品：校验英雄回合/目标状态，按类别回血（`heal`）或治愈状态（`cure_status`），并刷新 UI 与背包 |
+| `_show_toast(text)` | 在视口上部居中显示一条短暂渐隐提示（使用失败反馈） |
+
+**悬浮提示系统**（v3.2）：
+
+| 函数 | 职责 |
+|------|------|
+| `_build_skill_tooltip(sd)` | 组装技能悬浮提示：名称 + 描述 + 使用/目标位置 + 位移 + 效果数值 |
+| `_format_positions(positions)` | 将站位数组格式化为 `"1, 2, 3"` 文本 |
+| `_number_to_word(num)` | 数字转英文单词（用于技能图标路径 `one/two/three/...`） |
 
 ---
 
@@ -1706,7 +1761,29 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 #### `static calculate_damage(actor: Dictionary, skill_data: Dictionary) -> int`
 - **参数**：`actor` — 行动单位；`skill_data` — 技能数据
 - **返回值**：整型伤害值
-- **公式**：`int(actor["attack"] × skill_data["attack_ratio"])`
+- **公式**：`int(actor["attack"] × get_attack_multiplier(actor) × attack_ratio × get_damage_multiplier(actor))`
+- **两个增益乘区**（详见 §7.10）：
+  - `attack_mult`（攻击力加成，如"美德激励"/"战意高涨"）：**彼此加算**，`1.0 + Σ(mult - 1)`（例：1.2 + 1.2 = ×1.4）
+  - `damage_mult`（伤害加成，如"狗粮"）：**彼此乘算**，乘在最后（例：×1.4 × 1.2 = ×1.68）
+
+---
+
+#### `static get_attack_multiplier(unit: Dictionary) -> float`
+- **功能**：把该单位身上所有 `attack_mult` 状态的加成**加算**后返回总倍率（无则 `1.0`），供 `calculate_damage` 使用
+- **当前使用**：美德激励 `virtue_buff`（1.2，持续 5 回合）、战意高涨 `inspired`（1.2，持续 3 回合）——两者同时存在时为 ×1.4
+- **浮点处理**：`1.2 - 1.0` 的误差在加算时会累积，函数内用 `snappedf(total, 0.0001)` 抹平，避免 `int()` 截断平白少 1 点伤害（20 × 1.4 = 28 而非 27）
+
+---
+
+#### `static get_damage_multiplier(unit: Dictionary) -> float`
+- **功能**：把该单位身上所有 `damage_mult` 状态**连乘**后返回总倍率（无则 `1.0`）
+- **当前使用**：狗粮 `dogfood_buff`（1.2，持续 1 回合）
+
+---
+
+#### `static get_stress_taken_multiplier(unit: Dictionary) -> float`
+- **功能**：取该单位身上所有 `stress_taken_mult` 状态的最大值（无则 `1.0`），在 `apply_stress` 中**只放大加压**（`amount > 0`）
+- **当前使用**：折磨 `afflicted`（`stress_taken_mult = 1.2`，受到压力 +20%）
 
 ---
 
@@ -1723,14 +1800,16 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 ---
 
 #### `static apply_stress(target: Dictionary, amount: int) -> void`
-- **功能**：对目标施加并累积压力伤害（最高上限为 200 点限制）
+- **功能**：对目标施加并累积压力（上限 `StressConfig.MAX_STRESS = 200`），并处理阈值与满值结算
 - **触发机制**：
   1. 属性兜底校验：检查目标是否存在 `"stress"` 字段。若无（非英雄或初始化缺失）但在 `hp` 有效时原地初始化为 `0`。
-  2. 累加与夹逼：将目标压力值累加相应点数后调用 `clamp(stress + amount, 0, 200)`。
-  3. **满爆即死惩罚（Instant Death）**：
-     - 如果压力值在此次技能伤害后累加至 `200`（或以上），则进入溢出爆发结算。
-     - 立即将此角色的压力值**重置归零**（`target["stress"] = 0`）。
-     - 随之通过调用 `apply_damage(target, 999)` 对其造成 **999 点致死性斩杀伤害**。
+  2. **折磨加成**：加压时（`amount > 0`）按 `get_stress_taken_multiplier()` 放大 —— 处于折磨状态的目标受到的压力 +20%；减压不受影响。
+  3. **越阈掷骰（新增）**：压力越过 `AFFLICTION_THRESHOLD = 100` 且该英雄**当前既无折磨也无美德**时，
+     先把压力**钳制到 100** 并打上 `stress_resolve_pending = true`，随后由战斗层
+     `BattleController._resolve_pending_stress_states()` 掷骰：75% 折磨 / 25% 美德（详见 §7.14）。
+  4. **压力归零 / 满值收尾**：压力归零 → 清除折磨；压力达 200 → 清除美德 + 压力清零（连带清折磨）+ `apply_damage(target, 999)`；
+     若此时为折磨且已在濒死，则额外打上 `instant_death` 标记，由 `BattleController._handle_hero_damage_aftermath()` 直接处决（无视死门死扛）。
+     （折磨 / 美德与压力一起跨战斗保留，因此不存在"每场战斗只掷一次"的战斗内标记）
 
 ---
 
@@ -1768,13 +1847,28 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 
 #### 降级语料库
 
-- **`MOCK_CRUSADER_RESPONSES`** / **`MOCK_HIGHWAYMAN_RESPONSES`**：
-  在断网、请求异常或大模型应答超时时，基于角色生命状态（高血量/高压力/低血量濒死）自动路由匹配对应的高质量沉浸式中文台词。
+- **`MOCK_*_POSITIVE` / `MOCK_*_BUFF` / `MOCK_*_NEGATIVE` / `MOCK_*_BETRAY`**（Crusader / Highwayman 两套）：
+  在断网、请求异常或大模型应答超时时，按四种行为分别路由匹配高质量沉浸式中文台词。
+
+#### 四种激励结果（`LLMClient.Outcome`）
+
+| 标签 | Outcome | 结算效果 |
+|------|---------|----------|
+| `[RELIEVE]` | `RELIEVE` | ① 减压：压力 `-35` |
+| `[BUFF]` | `BUFF` | ② 增益：为英雄附加 `inspired`（战意高涨），攻击力 `+20%`，持续 `INSPIRE_BUFF_ROUNDS = 3` 回合 |
+| `[STRESS]` | `STRESS` | ③ 加压：压力 `+20` |
+| `[BETRAY]` | `BETRAY` | ④ 攻击队友：随机一名存活队友，受 `攻击力 × 0.5` 伤害 |
+
+- **标签解析**：`_parse_outcome_reply(raw, player_input)` 优先读标签；无标签时交给 `_keyword_outcome()` 关键词兜底（倒戈需明确暴力/背叛措辞才成立）；**若领主原话明显贬低（语气 ≤ -2）且台词又无姿态，则不会给出减压，至少按加压处理**。
+- **领主语气分析（2026-09 新增）**：`evaluate_input_tone(text)` 给出整数评分（负=贬低/敌意，正=鼓舞/信任）。词表分四档：重贬 `-3`（废物/蠢/没用/懦弱/不如狗/滚/闭嘴…）、轻度负面 `-1`（必须/少废话/赶紧/失望/活该…）、高度鼓舞 `+3`（相信你/佩服/英雄/谢谢你/以你为荣…）、轻度正面 `+1`（勇敢/坚持/圣光/感激…）；**每档只取首个命中（`break`）**，避免“蠢货”同时命中“蠢”与“蠢货”而重复扣分。评分区间为 `[-4, +4]`。
+- **Mock 分布权重**：`_generate_mock_result(is_crusader, hp, stress, player_input)` 先按 `stress/200` 与血量算基权重，再用语气评分修正——负面时长 `w_stress ×(1 + 严重度×2)`、`w_relieve` 几乎归零、`w_betray += max(严重度-0.5, 0)×0.5`（上限 0.35）；正面时反过来。
+- **Prompt 引导**：把语气评分与可读标签（`input_tone_label()`）写进 System Prompt，并把判定尺度改为**“领主原话是首要依据、战场形势是次要依据”**：真诚鼓舞→减压/增益；质疑轻蔑→加压；明确贬低/辱骂/威胁抛弃→必须偏向加压、极端恶劣时可直接倒戈。
 
 #### 关键方法
 
-##### `get_hero_reply(hero_name: String, personality: String, player_input: String, hero_hp: int, hero_max_hp: int, hero_stress: int, monsters_count: int, parent_node: Node) -> String`
+##### `get_hero_reply(...) -> Dictionary`
 - **功能**：拼装大模型 Prompt 并向外部服务器发起异步并行的 HTTP POST 请求。
+- **返回值**：`{"reply": String, "outcome": int}`（`outcome` 为 `LLMClient.Outcome` 四值之一）。
 - **流程与保护保障机制**：
   1. **系统预设Prompt构造**：将英雄名称、性格模组、玩家激励输入的文字、血量、英雄阈值、怪物多段包围重压等融合成极写实的文字上下文。
   2. **异步线程请求**：使用 `http_request.set_use_threads(true)` 进行多线程并发 IO 操作，绝不卡死 Godot 渲染主线程。
@@ -1844,8 +1938,6 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "crusader", 
 static var MONSTERS: Dictionary = {
     "cutthroat": { "name": "Cutthroat", "max_hp": 40, "attack": 5, "speed": 4,
                     "skills": ["cutthroat_strike", "temptation"] },
-    "troll":    { "name": "Troll",     "max_hp": 60, "attack": 5, "speed": 3,
-                    "skills": ["troll_smash"] },
     "skeleton_arbalist": { "name": "Bone Arbalist",  "max_hp": 27, "attack": 7, "speed": 5,
                     "skills": ["arbalist_crossbow", "arbalist_bayonet"] },
     "skeleton_courtier": { "name": "Bone Courtier",  "max_hp": 22, "attack": 4, "speed": 6,
@@ -1855,14 +1947,24 @@ static var MONSTERS: Dictionary = {
     "skeleton_defender": { "name": "Bone Defender",  "max_hp": 45, "attack": 3, "speed": 2,
                     "skills": ["defender_axe", "defender_shield"] },
     "skeleton_militia":  { "name": "Bone Militia",   "max_hp": 30, "attack": 5, "speed": 4,
-                    "skills": ["militia_slash"] },
+                    "skills": ["militia_slash", "militia_ranged"] },
     "skeleton_spear":    { "name": "Bone Spearman",  "max_hp": 30, "attack": 6, "speed": 5,
-                    "skills": ["spear_thrust"] },
+                    "skills": ["spear_thrust", "spear_pierce"] },
+    # === 门前恶狼 BOSS 战（Brigand 火器小队）===
+    "brigand_sapper":     { "name": "Brigand Vvulf",   "max_hp": 80, "attack": 7, "speed": 5,
+                    "skills": ["sapper_throw", "sapper_summon", "sapper_barrage"] },
+    "brigand_barrel":     { "name": "Brigand Barrel",  "max_hp": 50, "attack": 0, "speed": 0,
+                    "skills": [], "inert": true, "life_link": "brigand_sapper" },
+    "brigand_fuseman":    { "name": "Brigand Fuseman", "max_hp": 16, "attack": 4, "speed": 3,
+                    "skills": ["fuseman_light_fuse", "fuseman_hot_shot"], "life_link": "brigand_cannon" },
+    "brigand_cannon":     { "name": "Brigand Cannon",  "max_hp": 60, "attack": 6, "speed": 2,
+                    "skills": ["cannon_fire", "cannon_summon", "cannon_blast"] },
 }
 static var CURRENT_ENCOUNTER: Array[String] = ["skeleton_common", "skeleton_defender", "skeleton_arbalist", "skeleton_courtier"]
 ```
 
-> `speed_delta` 现由 `BattleController._start_new_round()` 每轮随机生成，`speed_delta_base` 字段已废弃。当前遭遇为 4 只骷髅系怪物（勇士+盾卫+弩手+酒杯），用于测试 4v4 战斗与站位机制。
+> `speed_delta` 现由 `BattleController._start_new_round()` 每轮随机生成，`speed_delta_base` 字段已废弃。
+> 新增可选字段：`skills`（技能 id 数组，空数组 = 永不行动）、`inert`（惰性单位，如弹药桶，永不进入行动队列）、`life_link`（生命链接：该怪阵亡时，`life_link` 指向它的怪物一同倒下）。当前遭遇为 4 只骷髅系怪物（勇士+盾卫+弩手+酒杯）。
 
 ---
 
@@ -1930,6 +2032,44 @@ static var CURRENT_ENCOUNTER: Array[String] = ["skeleton_common", "skeleton_defe
 - 在 _on_hero_reposition_target() 中，位置交换后立即重建 _spine_players 和 _spine_current_state 字典
 - 根据循环移位方向（左移或右移）准确计算新索引映射
 - 重建队列确保队列中的索引也与新位置对齐
+
+### 问题 4：消耗品按钮左/右键都点不到
+**症状**：消耗品格子（食物）能看见，但左键、右键点击均无反应  
+**根本原因**：格子按钮最初挂载在 `PanelInventory`（仅 280×130）下，而背景贴图通过 `offset_left = 370` 画在父控件范围之外；Godot 的 GUI 命中测试（`has_point`）在父控件矩形外直接失败，不再向下递归到子按钮  
+**解决方案**：
+- 把槽位容器改挂到全屏的 `battle_ui`（`$BattleUI`）下
+- 用 `panel_inventory_bg.get_global_rect()` 计算背景贴图的全局矩形作为槽位定位基准，使按钮命中区域与可见区域完全一致
+- 首帧（布局稳定后）在 `_process` 中调用一次 `_build_inventory_panel()`（`_inventory_initialized` 标记防重入）
+- 顺带把按钮触发改为左键（`MOUSE_BUTTON_MASK_LEFT`），并为「非英雄回合」「满血」等失败场景增加 `_show_toast()` 屏幕提示
+
+### 问题 5：地图生成越界（Invalid assignment of index '5'）
+**症状**：点击「开始战斗」进入地图生成时报 `_set_cell: Invalid assignment of index '5' (on base: 'Array')`  
+**根本原因**：`_cell_kind()` 对空格与地图外都返回 `""`，`_empty_neighbors()` 未先判边界，把地图外格子（小地图第 5 行/列）当成可用空格写入候选，随后 `_set_cell()` 越界写入  
+**解决方案**：在 `DungeonMap._empty_neighbors()` 中显式校验 `nr` / `nc` 是否在 `MAP_GRID` 范围内，越界邻居直接 `continue` 跳过
+
+### 问题 6：新怪物贴图乱码 / 模型残缺（Unicode NUL 报错）
+**症状**：控制台刷屏 `Unicode parsing error ... Unexpected NUL character`，且该怪物的插槽名变乱码、`attachments=0`、`anims=0`，模型不可见（实测：`brigand_fuseman`）  
+**根本原因**：`.skel` 的 **IK 约束段**中 `bendDirection` 是**单字节有符号值**，而 `SpineSkel` 误用 varint 读取：`bend=+1` 写作 `01`（两种读法同为 1 字节，因此长期隐形），但 `bend=-1` 写作 `FF`，varint 因高位为 1 而**多吃 1 字节**，导致后续所有段落整体错位  
+**解决方案**：新增 `_Reader.read_byte()`（单字节有符号）并在 IK 段使用。体检工具：`tools/_probe_skel_integrity.gd`（递归解析全部 `.skel`，当前基线 168 个中仅 `crusader.sprite.walk.skel` 为历史遗留 `anims=0`）；字节级定位：`tools/_diag_skel.py`
+
+### 问题 7：BOSS 战尸体直立在场上 / 打掉尸体后补位错乱
+**症状**：① 首领、大炮、点火员、弹药桶阵亡后尸体**笔直站着**，与活体无法区分；② 打掉尸体后前方怪物前移，但末位（4 号）卡槽仍残留旧血条与旧图标，看起来像补位错乱  
+**根本原因**：  
+① 这些骨架**没有独立 dead 动画**，`MONSTER_ANIM_CONFIG[id]["map"]["dead"]` 只是回落到 `"combat"`，所以播 dead 实际播的是站立动作。  
+② `_update_list_ui()` 只遍历到 `heroes.size()` / `monsters.size()`，单位被移除后**尾部槽位没有被清理**。  
+**解决方案**：  
+- `_load_monster_anim()` 对"无真实 dead 动画"的骨架把资源整体换成**普通小怪残骸**（`CORPSE_REMAINS_DEFAULT`，默认 `brigand_cutthroat.sprite.dead`，与 BOSS 同属强盗阵营）；有真实 dead 动画的骨架不受影响；可在 `MONSTER_ANIM_CONFIG` 条目里用 `"corpse"` 字段单独指定。`_summon_monster()` 重建 SpinePlayer 时自然换回自身骨架。  
+- `_update_list_ui()` 改为遍历**全部**槽位：先 `_clear_children()`，再按数组长度决定是否填内容。  
+- 顺带补防守：`_update_character_portrait()` / `_update_skill_buttons()` 里 `heroes[current_actor["index"]]` 加下标范围校验（补位瞬间可能失效），否则会抛 `Invalid access of index '3' on ... 'Array[Dictionary]'`。
+
+### 问题 8：英雄状态栏/死门提示被下方 UI 遮挡
+**症状**：英雄卡槽里的状态异常图标行、`DEATH'S DOOR xx%` 行被左下角技能面板/背包面板盖住看不见  
+**根本原因**：卡槽内容行累计高度约 293px（从槽顶 +70 到 +363），而下方不透明区域 `BottomPanelsContainer` 从 **y≈278** 开始 → 状态行（292~314）与死门行（318~336）整行落在遮挡区内  
+**解决方案**：  
+- 血条/压力条数值**内嵌到条上**（`_make_bar_value_label()`，`PRESET_FULL_RECT` + 居中 + 描边），省掉两行文本；条高 14→12，VBox `separation` 4→2、`alignment` 改为 `BEGIN`  
+- 状态图标行、死门行、尸体标记行改挂**卡槽顶部悬浮区**（`TOP_OVERLAY_HEIGHT = 42`，锚在内容顶部、`alignment = END`），落在卡槽上方 `≈28~70` 的空闲带，既不遮挡也不挤压角色  
+- "▲ 当前行动者"并入速度标签文本，省掉一整行  
+- 结果：最低一行 237 ≤ 278，角色脚底仍 197（目标 200±8）；验证：`tools/_probe_corpse_ui.gd`，肉眼复核：`tools/_shot_check.gd`
 
 ---
 
@@ -2074,6 +2214,255 @@ const SKILL_FX_MAP := {
 | `militia_slash` | `sword_strike` | — | `attack` |
 | `spear_thrust` | `spear_thrust` | — | `attack` |
 
+### 7.8 消耗品背包系统
+
+消耗品（食物 Food / 绷带 Bandage / 狗粮 Dog Food）在战斗界面左下角以 16 格网格渲染，左键点击即可使用。
+
+**渲染与命中（`_build_inventory_panel()` / `_add_inventory_slot()`）**：
+- 槽位容器挂载到全屏的 `battle_ui`（`$BattleUI`）下，而非 `PanelInventory`——后者仅 280×130，背景贴图通过 `offset_left = 370` 画在其矩形之外，会导致子按钮的命中测试（`has_point`）失效，表现为「能看到却点不到」。
+- 定位基准：`panel_inventory_bg.get_global_rect()`，使槽位与背景可见区域完全重合。
+- 16 格几何：主网格 7×2（左侧）+ 右侧独立列 2 格；每个格子是 `Button`（`flat`，`button_mask = MOUSE_BUTTON_MASK_LEFT`），显示图标 + 数量角标 `xN`。
+
+**使用逻辑（`_try_use_consumable()`）**：
+- 前置条件：非战斗结束、非特效暂停、当前行动者为英雄。
+- 回血类（如食物）：英雄已满血时拒绝使用且不消耗；否则 `ActionResolver.apply_heal()` 回血（自动截断到 `max_hp`）。
+- **治愈类（如绷带）**：由 `_use_cure_consumable()` 处理——仅当英雄身上确实带有 `cure_status` 中任一状态时才允许使用（否则提示且不消耗），逐个 `ActionResolver.remove_status()` 移除，并用 `_show_status_popup()` 弹出被治愈状态的图标。
+- **增益类（如狗粮）**：由 `_use_buff_consumable()` 处理——`ActionResolver.apply_status()` 附加 `buff_status` 状态（持续 `buff_duration` 回合），`_show_status_popup()` 弹出增益图标并弹出提示。使用消耗品**不占用行动次数**，因此英雄可以先吃狗粮再出手，当次攻击即享受 +20% 伤害。
+- 收尾：`_update_ui()` + `_build_inventory_panel()` 刷新（状态徽标同步消失/出现）。
+- 失败反馈：`_show_toast()` 在视口上部居中显示「当前不是英雄行动回合，无法使用消耗品」/「生命已满，无需使用」/「没有可被绷带治愈的状态」。
+
+**背包数据（`ConsumableConfig`）**：
+- `INVENTORY`：`Array[Dictionary]`，最多 `MAX_SLOTS = 16` 格，同种无限堆叠。
+- 增删接口：`add_item()` / `consume_item()` / `get_count()` / `get_item()`；开新局由 `StartController` 调用 `reset_inventory()` 发放初始补给（4 食物 + 2 绷带 + 2 狗粮），战斗胜利后由结算步骤继续补充。
+
+### 7.9 技能 / 消耗品悬浮提示系统
+
+鼠标悬浮在技能图标或消耗品格子上时，显示多行描述（名称 + 描述 + 可用位置 + 效果）。
+
+**技能提示（`_build_skill_tooltip(sd)`）**：
+- 名称、`description`、`use_positions`（使用位置）、`target_positions`（目标位置）。
+- 位置说明「1=最前，4=最后」；有 `move_forward` 时显示「位移：前进/后退 N」；有 `target_move_forward` 时显示「目标位移：拉前 N 位 / 推后 N 位」。
+- 效果：`damage` 显示「伤害 X% 攻击力」；`heal` 显示「治疗 X 点生命」；`composite_heal`（battle_cry）显示「回复 X 生命、X 压力；其他队友 -X 压力」。
+
+**消耗品提示**：名称 + `description` + 「可用位置：无限制（对当前行动英雄使用）」+ 「效果：…」，效果行由配置驱动——有 `heal` 显示「回复 X 点生命」，有 `cure_status` 显示「治愈<状态名>」（如绷带显示「治愈流血」），有 `buff_status` 显示「附加<状态名>（N 回合）」（如狗粮显示「附加狗粮（1 回合）」）。
+
+**实现**：直接赋值 `Button.tooltip_text`（多行用 `\n` 拼接）；技能图标按钮在 `_update_skill_buttons()` 创建时挂载，消耗品格子在 `_add_inventory_slot()` 创建时挂载。位置格式化由 `_format_positions()` 完成（`[1,2,3]` → `"1, 2, 3"`）。
+
+### 7.10 状态异常（Buff / Debuff）系统
+
+**数据定义（`StatusConfig.STATUSES`）**：
+
+| 状态 | id | 关键字段 | 效果 |
+|------|----|----------|------|
+| 流血 | `bleed` | `dot = true` | 每回合扣除当前层数点生命 |
+| 腐蚀 | `blight` | `dot = true` | 每回合扣除当前层数点生命 |
+| 晕眩 | `stun` | `skip_turn = true` | 该单位行动时跳过一次行动，跳过即解除 |
+| 标记 | `mark` | `damage_taken_mult = 1.3` | 承受伤害 +30%（不含流血/腐蚀等 DoT） |
+| 守护 | `guard` | 携带 `guardian_id` / `guardian_slot` | 被敌人单体攻击时伤害转移给守护者 |
+| 爆破标记 | `bomb_mark` | `manual_duration = true`, `detonate_damage = [14,20]` | 首领投弹锁定：下一回合开始时引爆造成 14~20 伤害（摧毁弹药桶可解除） |
+| 装填完毕 | `cannon_loaded` | 大炮携带 | 大炮下次行动时向全体英雄开火（高额 AoE + 压力），开火后消耗 |
+| 折磨 | `afflicted` | `stress_taken_mult = 1.2`, `manual_duration = true` | 精神崩溃：受到的压力 +20%，每次行动 30% 概率失控（详见 §7.14） |
+| 美德 | `virtuous` | `manual_duration = true` | 压力清空并成为全队精神支柱（数值增益由 `virtue_buff` 承担） |
+| 美德激励 | `virtue_buff` | `attack_mult = 1.2`（攻击力乘区，加算） | 攻击力 +20%，持续 5 回合（美德触发时施加给全体英雄；与战意高涨**加算**） |
+| 狗粮 | `dogfood_buff` | `damage_mult = 1.2`（伤害乘区，乘算） | 最终伤害 +20%，持续 1 回合（消耗品「狗粮」使用后附加；与攻击力加成**乘算**） |
+| 战意高涨 | `inspired` | `attack_mult = 1.2`（攻击力乘区，加算） | 攻击力 +20%，持续 3 回合（AI 激励喊话的 ② 增益结果；与美德激励**加算**） |
+
+> **`manual_duration`**：存续回合数**不参与** `tick_statuses()` 的按回合衰减，完全由战斗逻辑显式移除（`bomb_mark` 在引爆或解除时由 `BattleController` 清除）。新增“寿命由事件掌握”的状态时务必加上该字段，否则它会在事件发生前自行消失。
+
+**技能挂载**：`SkillConfig` 中为技能配置 `status_effects` 数组即可：
+
+```gdscript
+"status_effects": [{"status_id": "stun", "stacks": 1, "duration": 1}]
+```
+
+由 `ActionResolver.resolve_on_target()` 末尾统一调用 `apply_status()` 施加到目标（`resolve_on_all()` 会对每个存活目标逐个调用）。
+
+**结算时机（重要）**：所有状态（DoT 伤害 + 持续时间/层数衰减）**都在该状态的携带者自己行动时结算**；回合开始（`_start_new_round()`）**不做任何统一结算**。唯一调用点是 `BattleController._tick_current_actor_statuses()`，由 `_get_next_actor()` 在弹出行动者后调用——因此 A 行动时不会消耗 B 身上的状态。验证结果（探针实测）：
+
+| 动作 | 携带者 hp | 携带者状态 |
+|------|-----------|-------------|
+| 初始（bleed 3层/5回合、mark 1层/5回合） | 50 | `{bleed:3/5, mark:1/5}` |
+| `_start_new_round()`（回合开始） | 50（不变） | 不变（不结算） |
+| 携带者自己行动 | 47（-3） | `{bleed:3/4, mark:1/4}`（各 -1） |
+| 队友行动 | 47（不受影响） | 不变 |
+
+**DoT 结算**：`ActionResolver.tick_statuses(unit)` 扣血值 = 层数，随后 `duration - 1`，到期移除。对 `skip_turn = true` 的控制类状态**跳过 duration 递减**，交由行动判定处理。
+
+**晕眩（`stun`）判定在单位行动时进行**（`BattleController._tick_current_actor_statuses()`，由 `_get_next_actor()` 在弹出行动者后立即调用）：
+
+1. `ActionResolver.consume_skip_turn(unit)`：判定是否处于控制状态，命中则**立即移除**并返回 `true`（`has_skip_turn()` 为纯查询版本）。
+2. 继续执行常规 DoT 结算（`tick_statuses`）与死亡/尸体处理。
+3. 若单位仍存活且被晕眩 → `_skip_turn_by_stun(unit)`：
+   - `unit["actions_remaining"] = max(0, ... - 1)` —— **真正消耗掉该次行动**。这一点很关键：若不扣点，队列耗尽时 `has_remaining_actions()` 会让它被重新 `build()` 入队，只是"延后"而非"跳过"。
+   - `_show_status_popup()` 在头顶弹出 `res://overlays/tray_stun.png` 图标（复用 `_show_stress_seal_delayed()` 的上浮淡出）。
+   - `_update_ui()` 刷新，使状态徽标同步消失。
+4. 函数返回 `false` → `_get_next_actor()` 的 `continue` 直接取下一个行动者（随后照常执行 `_check_victory()` / `_check_defeat()` 判定）。
+
+**UI**：
+- `_make_status_row(unit)` 在血条（怪物）/ 压力条（英雄）下方渲染状态图标；**只有 `dot` 状态显示层数角标**。
+- `_build_status_tooltip()` 对 `skip_turn` 状态只显示名称 + 描述；其余显示「剩余回合」，仅 `dot` 追加「层数」。
+- `_build_skill_tooltip()` 中 `skip_turn` 状态显示为「跳过下一次行动（跳过即解除）」。
+
+**易伤（`mark`）结算**：
+- `ActionResolver.get_damage_taken_multiplier(target)` 取目标身上所有 `damage_taken_mult` 的最大值。
+- `apply_damage(target, amount, apply_mark_mult := true)` 在扣血前按倍率放大；**DoT 结算显式传 `apply_mark_mult = false`**，保证流血/腐蚀不吃标记加成。
+- 浮字伤害由 `_emit_feedback()` 对比结算前后 hp 差值生成，因此标记放大后的数字会自动正确显示。
+
+**守护（`guard`）伤害转移**：
+- 施加：`ActionResolver.apply_guard(guardian, target, duration)`，不叠加层数、重复施放直接覆盖；守护者身份用 `(guardian_id, guardian_slot)` 记录（英雄换位会改变 `heroes` 下标，但 `id`/`slot` 始终跟随本人）。
+- 转移：`BattleController._resolve_guard(unit)` 在**敌人单体攻击**选中目标后调用——命中被守护者时改为打守护者；守护者阵亡/濒死之外不转移、指向自己也不转移。挂接点在 `_execute_monster_action()` 的 `single_enemy` 分支，**群体技能（`all_enemies`）不受影响**。
+- 持续：`duration` 在被守护者自己的行动回合递减（与其他非 DoT 状态一致）。
+
+### 7.11 训犬师（Houndmaster）配置
+
+英雄模板位于 `HeroConfig.HEROES["houndmaster"]`（HP 45 / ATK 18 / SPD 4），4 个技能定义在 `SkillConfig.SKILLS`，动画与特效分别接入 `BattleController` 的 `HOUNDMASTER_ANIM_MAP` / `SKILL_FX_MAP`。
+
+| 技能 | 效果类型 | 机制 | 动画 | 特效 |
+|------|----------|------|------|------|
+| 释放猎犬 | `damage` | 远程单体，可打任意站位（`use_positions [2,3,4]` / `target_positions [1,2,3,4]`） | `attack_rush` | `hounds_rush` |
+| 标记弱点 | `damage` + `status_effects` | 小额伤害并附加 `mark`（承受伤害 +30%，持续 3 回合） | `attack_point` | `whistle` |
+| 振奋犬吠 | `composite_heal` | 选中队友 -6~8 压力、其他队友 -2~3 压力（结构同 `battle_cry`） | `attack_howl` | `baleful_howl` |
+| 守护队友 | `guard` | 为队友附加 `guard`，敌人单体攻击转移给训犬师，`guard_duration = 3` | `attack_guard` | `guard_dog` |
+
+接线点：
+- `BattleController.HERO_SPINE_IDS`（`["crusader","highwayman","occultist","houndmaster"]`）决定 `_setup_battle()` 为哪些英雄创建 SpinePlayer。
+- `_load_hero_anim()` 中新增 `houndmaster` 分支，PNG 目录 `res://characters/houndmaster/houndmaster_A/anim`。
+- 头像 `characters/houndmaster/houndmaster_guild_header.png`、技能图标 `houndmaster.ability.{one..four}.png` 均已就绪；`HeroConfig.get_all_hero_ids()` 可列出全部英雄 id（编队选择界面已移除，该接口仍供数据层使用）。
+
+### 7.12 门前恶狼 BOSS 战（Brigand 火器小队）
+
+地图 Boss 房遭遇固定为 `DungeonMap.BOSS_ENCOUNTER = ["brigand_sapper", "brigand_barrel", "brigand_fuseman", "brigand_cannon"]`（下标即站位）：
+
+| 站位 | 怪物 | HP / ATK / SPD | 行为 |
+|------|------|----------------|------|
+| 1 | 首领 Brigand Vvulf (`brigand_sapper`) | 80 / 7 / 5 | 弹药桶在场时投弹标记；不在场时召回弹药桶或炮击前排两位 |
+| 2 | 弹药桶 Brigand Barrel (`brigand_barrel`) | 50 / — / — | **惰性单位**（`inert`），永不行动，仅作为首领的“弹药” |
+| 3 | 点火员 Brigand Fuseman (`brigand_fuseman`) | 16 / 4 / 3 | 为大炮装填引信；大炮阵亡时一同倒下 |
+| 4 | 大炮 Brigand Cannon (`brigand_cannon`) | 60 / 6 / 2 | 装填完毕时全体轰击；点火员不在场时召回点火员 |
+
+**四条联动规则**：
+
+1. **投弹标记（`sapper_throw`）**：`effect_type: "apply_status"`，不给伤害，给英雄挂 `bomb_mark`（状态带 `manual_duration: true`，不参与 `tick_statuses` 的回合衰减）。
+2. **下回合引爆（不占行动）**：投弹时 `_register_pending_bomb()` 把 `{"hero_slot", "due_round"}` 写入 `_pending_bombs`；下个回合开始时 `_start_new_round()` → `_resolve_pending_bombs()` 引爆，播放 `detonate_target` 特效并造成 `detonate_damage`（14~20）伤害。**属于 debuff 结算行为，不进行动队列、不扣任何人的 `actions_remaining`。**
+3. **弹药桶决定投弹权限**：`sapper_throw` 带 `requires_alive_ally: ["brigand_barrel"]`；`sapper_summon` / `sapper_barrage` 带 `requires_absent_ally: ["brigand_barrel"]`，因此“桶在则投弹、桶亡则召回或炮击”由条件系统自动成立。
+4. **大炮 ↔ 点火员**：`fuseman_light_fuse`（`target_ally_id: "brigand_cannon"` + `target_ally_status_absent: "cannon_loaded"` + `skill_priority: 1`）装填——只要大炮还需装填，点火员就**一定**点火而不会改用备选攻击；`cannon_fire`（`requires_self_status` + `consume_self_status: "cannon_loaded"`）装填后全体 AoE 并在开火后卸弹；`cannon_summon`（`requires_absent_ally: ["brigand_fuseman"]`）与 `cannon_blast`（需点火员在场且自身未装填）保证三招互斥。
+
+**反制（可玩性）**：摧毁弹药桶 → `_disarm_pending_bombs()` 立即清除所有 `bomb_mark`（`_resolve_pending_bombs()` 还有“无桶则哑弹”的第二道保险）；杀死点火员 → 大炮当回合只能召回；**生命链接**（`life_link`）让大炮阵亡时点火员随之倒下、首领阵亡时弹药桶随之损毁。
+
+**战斗内召唤（`_summon_monster()`）**：优先占用尸体槽位（直接替换 `monsters[slot]`，不改变其它单位索引），其次追加队尾，槽位满则放弃；新单位 `actions_remaining = 0`，登场当回合不行动；Spine 渲染按 `MONSTER_ANIM_CONFIG` 重建。
+
+**验证**：`godot --headless --path <项目> --script res://tools/_probe_boss_battle.gd`（106 条断言：数据接线 / 投弹引爆 / 弹药桶解除 / 装填开火 / 召唤 / 生命链接，输出 `PASS=106 FAIL=0`）；`res://tools/_probe_boss_live.gd` 则逐只怪物真实跑 `_execute_monster_action()` 全程（含特效与召唤，`PASS=11 FAIL=0`）。
+
+### 7.13 死门（Death's Door / 濒死）机制
+
+死门是英雄独有的「濒死续命」机制，实现集中在 `BattleController._handle_hero_damage_aftermath(hero_idx, took_damage := true)`：
+
+| 情形 | 处理 |
+|------|------|
+| 生命值首次降至 0 | **不会立刻死亡**，而是进入濒死状态（`is_death_door = true`、`hp = 0`），头顶弹出 `tray_deathsdoor.png` 图标 |
+| 濒死状态下**受到伤害** | 按该角色自己的 `death_blow_chance` 掷一次死亡骰：命中则当场阵亡（`_kill_hero`），否则继续支撑并弹出 `poptext_death_avoided.png`（死里逃生） |
+| 治疗等**非伤害结算**（`took_damage = false`） | 不掷骰；只要生命值回复到 0 以上就自动脱离濒死 |
+| 濒死期间 | 仍可正常行动（`TurnQueue` 把濒死视为存活）、可被治疗/守护、也可被选为目标 |
+
+**概率写在每个角色自己的配置里**：`HeroConfig.HEROES[hero_id]["death_blow_chance"]`（当前 4 名角色均为 `0.5`），未配置时回落到 `HeroConfig.DEFAULT_DEATH_BLOW_CHANCE`。战斗开始时由 `_death_blow_chance_of()` 写入英雄运行时字典，掷骰处再 `clampf` 夹逼一次。
+
+**`took_damage` 参数（重要）**：只有「真的挨了伤害」才掷死亡骰，因此各调用点显式区分：
+
+| 调用点 | 传参 | 说明 |
+|--------|------|------|
+| DoT 结算（`_tick_current_actor_statuses`） | `true` | 流血/腐蚀造成伤害时掷骰 |
+| 怪物单体 / 群体技能（`_execute_monster_action`） | `is_dmg` | 仅 `effect_type == "damage"` 的技能才掷骰 |
+| 首领炸药引爆（`_detonate_bomb`） | `true` | 爆炸是真实伤害 |
+| 激励倒戈攻击队友（`_execute_inspire_betrayal`） | `true` | 真实伤害 |
+| 治疗技能（`_on_ally_pressed`）/ 消耗品回血（`_try_use_consumable`） | `false` | 治疗不是伤害；**修掉了旧版「为队友治疗/治疗量掷出 0 时也会给濒死队友掷死亡骰」的误杀缺陷** |
+
+**UI**：濒死英雄的卡槽在血条/压力条下方渲染 `_make_hero_slot()` 的死门行——`tray_deathsdoor.png` 图标 + `DEATH'S DOOR 50%` 文本，悬浮提示说明机制与本次角色自己的死亡概率。
+
+**持久化**：`HeroConfig.PARTY_STATES` 已记录 `is_death_door`，跨房间战斗会延续濒死状态（0 HP 起手＝濒死）。
+
+**验证**：`godot --headless --path <项目> --script res://tools/_probe_deaths_door.gd`（33 条断言：角色配置接线、归零不死、濒死仍可入队、0%/100% 概率边界、非伤害结算不掷骰、治疗后脱离濒死、卡片死门图标与概率提示渲染，输出 `PASS=33 FAIL=0`）。
+
+### 7.14 压力系统：折磨（Affliction）/ 美德（Virtue）
+
+数值与概率集中在 `scripts/data/StressConfig.gd`（均为 `static var`，方便探针脚本临时改写以确定性覆盖各分支）：
+
+| 常量 | 默认值 | 含义 |
+|------|--------|------|
+| `MAX_STRESS` | 200 | 压力上限（满值触发心脏骤停） |
+| `AFFLICTION_THRESHOLD` | 100 | 越阈掷骰的阈值 |
+| `AFFLICTION_CHANCE` | 0.75 | 越阈后进入折磨的概率 |
+| `VIRTUE_CHANCE` | 0.25 | 越阈后进入美德的概率 |
+| `AFFLICTION_STRESS_TAKEN_MULT` | 1.2 | 折磨状态下受到的压力倍率 |
+| `BREAKDOWN_CHANCE` | 0.3 | 折磨状态下每次行动的失控概率 |
+| `BREAKDOWN_ATTACK_RATIO` | 0.5 | 失控"攻击队友"的伤害系数 |
+| `BREAKDOWN_STRESS_AMOUNT` | [8, 14] | 失控"增加队友压力"的压力区间 |
+| `VIRTUE_ATTACK_MULT` / `VIRTUE_BUFF_ROUNDS` | 1.2 / 5 | 美德激励的攻击力倍率与持续回合数 |
+
+**结算流程**
+
+1. **越阈掷骰（以状态为准，不按战斗重置）**：`ActionResolver.apply_stress()` 发现英雄压力越过 100、
+   且**当前既没有折磨也没有美德**时，先**钳制到 100** 并打上 `stress_resolve_pending`；
+   随后 `BattleController._resolve_pending_stress_states()`（由 `_emit_feedback()` 末尾与激励喊话路径调用）执行 `_resolve_stress_threshold()`：
+   - **75% 折磨**：施加 `afflicted`，头顶弹出 `tray_afflicted.png` + `panels/seal.affliction.png`，Toast 提示；
+   - **25% 美德**：压力清零 + 施加 `virtuous`，并给**全体英雄**施加 `virtue_buff`（`attack_mult = 1.2`，持续 5 回合）。
+   - 掷出的状态会挂在身上，因此在持有期间**不会重复钳制/重掷**，压力可正常累到 200；
+     状态被清掉（见下条）后再度越阈则会重新掷骰。
+2. **三条清零 / 满值规则**：
+
+   | 时机 | 行为 |
+   |------|------|
+   | 压力**归零** | 解除折磨（减压类效果如激励喊话、鼓舞犬吠、美德清空都能让英雄平静下来） |
+   | 压力**达到 200** | 清除美德 → 压力清零（连带清除折磨）→ `apply_damage(999)`（心脏骤停） |
+   | 200 **且折磨且已在濒死** | 额外打上 `instant_death` 标记，`_handle_hero_damage_aftermath()` 直接处决（不掷死门死亡骰） |
+
+3. **跨战斗保留**：折磨 / 美德与压力一起持久化——`HeroConfig.persist_party_after_battle()` 把 `is_afflicted` / `is_virtuous` 写入 `PARTY_STATES`，
+   `get_team_heroes()` 还原到编队模板，`BattleController._build_hero_runtime()` 再还原成状态。`virtue_buff` 是限时增益，不跨战斗。
+4. **折磨失控（30%）**：`_get_next_actor()` 轮到英雄行动时调用 `_should_roll_breakdown()`，命中则本回合改由
+   `_execute_affliction_breakdown()` 接管，四种行为等概率（`BREAKDOWN_OUTCOMES`）：
+
+   | 行为 | 实现 |
+   |------|------|
+   | 跳过行动 | 直接消耗行动点（与晕眩跳过一致） |
+   | 攻击队友 | 复用 `_execute_inspire_betrayal(actor, StressConfig.BREAKDOWN_ATTACK_RATIO)` |
+   | 增加队友压力 | `_execute_breakdown_stress_ally()`：对随机队友加 8~14 压力（会连带触发对方的越阈结算） |
+   | 自动随机行动 | `_auto_perform_random_action()`：随机挑一个站位可用、目标合法的技能，然后走**与玩家操作完全相同**的结算流程（特效/聚焦/数值/扣点/推进队列） |
+
+   > 失控行为均会消耗该英雄本回合行动点（手动扣点 + `turn_queue.build()`）；"自动随机行动"因为走的是正常技能流程，内部已扣点并推进队列，因此 `_execute_affliction_breakdown()` 返回 `true` 让 `_get_next_actor()` 直接 `return`，避免双重推进。
+   > 无可用技能/无队友可打时自动退化为"跳过行动"；濒死（HP = 0）英雄因 `_can_act()` 不通过也会退化为跳过。
+3. **攻击力加成（两个乘区）**：`ActionResolver.calculate_damage()` 会乘上 `get_attack_multiplier()`（美德激励 / 战意高涨，**彼此加算**）与 `get_damage_multiplier()`（狗粮，**乘算**）——因此美德激励对**所有英雄**的伤害技能生效，且不会与战意高涨叠成 ×1.44。
+6. **UI**：状态图标行显示折磨/美德/美德激励（带悬浮说明）；折磨状态下英雄的压力条填充色转为暗红作为警示。
+
+**验证**：`godot --headless --path <项目> --script res://tools/_probe_stress.gd`（75 条断言：配置接线、越阈钳制与两种掷骰结果、以状态为准不重复掷骰、折磨加压 +20%、压力归零解除折磨、美德清空压力与全体 5 回合攻击加成、四种失控行为、200 的清美德/清折磨/濒死直接处决、跨战斗持久化、与 `_emit_feedback` 的集成，输出 `PASS=75 FAIL=0`）。
+
+### 7.15 怪物尸体视觉与卡槽（补位 / 布局）
+
+**尸体视觉（直接借用普通小怪残骸）**：怪物阵亡后 `_handle_monster_damage_aftermath()` 会把它标成尸体（`is_corpse = true`、`hp = 10`），
+`_update_monster_animations()` 对尸体调 `_load_monster_anim(i, "dead")`。但首领/大炮/点火员/弹药桶的骨架**没有独立 dead 动画**（`map["dead"] == map["combat"]`），
+因此 `_load_monster_anim()` 在加载时把这类尸体的资源整体换成**普通小怪的残骸**：
+
+| 情况 | 表现 |
+|------|------|
+| 骨架有真实 dead 动画（强盗/骷髅系） | 照旧播自己的 `dead` |
+| 骨架无真实 dead 动画 | 加载 `CORPSE_REMAINS_DEFAULT`（默认 `brigand_cutthroat.sprite.dead`，`base`/`dir`/`anim` 三字段）并 `play("dead")` |
+
+- 需要单独指定时，在 `MONSTER_ANIM_CONFIG` 条目里加 `"corpse": {"base": ..., "dir": ..., "anim": ...}`（优先读它）。
+- 残骸自带倒地姿态，且其几何底部与站立骨架脚底同高（实测屏幕上尸体矩形 `281~359` vs 站立单位脚底 `361`）→ 尸体正好躺在地面线上，无需再压暗/旋转。
+- `_summon_monster()` 会销毁并重建该槽位的 SpinePlayer，因此召唤回尸体槽时自动换回自己的骨架。
+
+**卡槽补位**：`_update_list_ui()` 遍历**全部** 4 个 `hero_slots` / `monster_slots`——先 `_clear_children()`，再按数组长度决定是否填内容，
+这样单位被移除（清尸体、英雄阵亡）后尾部槽位不会残留旧的血条与图标。
+
+**卡槽纵向布局预算**（720p 下 `BottomPanelsContainer` 顶边 ≈278，卡槽内容必须全部落在其上）：
+
+| 行 | 全局 Y | 手法 |
+|----|--------|------|
+| 顶部悬浮区（状态图标 + 死门/尸体标记） | ≈28~70 | `TopOverlay` 锚在内容顶部、`offset_top = -TOP_OVERLAY_HEIGHT`、`alignment = END`，占用卡槽上方空闲带 |
+| 速度标签（含 `▲` 当前行动者标记） | 70~87 | 字号 12；行动标记并入文本省一行 |
+| 肖像锚点（SpinePlayer 定位基准） | 89~209 | 脚底 197≈200 |
+| 血条 / 压力条（数值内嵌） | 211~223 / 225~237 | `_make_bar_value_label()` 铺满居中，条高 12、`separation = 2` |
+
+**验证**：`godot --headless --path <项目> --script res://tools/_probe_corpse_ui.gd`（`PASS=28 FAIL=0`）；肉眼复核：`godot --path <项目> --script res://tools/_shot_check.gd` → `res://shot_check.png`。
+
 ### 速度浮动系统
 
 
@@ -2137,6 +2526,106 @@ while 循环驱动（在 _get_next_actor() 内）：
 
 ---
 
+### 7.16 战斗结算（战利品）步骤
+
+每场战斗**胜利后**增加一步「结算」：在屏幕右侧弹出战利品面板，玩家点击确认后才把补给放入物品栏（失败没有战利品，直接放行）。
+
+**战利品表（`BattleController.BATTLE_LOOT_TABLE`）**：
+
+| 物品 | 数量 | 说明 |
+|------|------|------|
+| `food` | 1~4 | 必定掉落 |
+| `bandage` | 0~1 | 概率掉落 |
+| `dogfood` | 0~1 | 概率掉落 |
+
+数量为 `[min, max]` 区间，由 `ActionResolver.roll_range_int()` 掷取；掷到 0 的条目不会出现在面板上（`_roll_battle_loot()` 只保留 `count > 0` 的条目）。
+
+**流程（`_end_battle()`）**：
+1. `battle_over = true`；顶部新增 `if battle_over: return` 守卫，避免胜负判定被重复触发时重复掷战利品。
+2. 胜利 → `_begin_loot_step()`：掷战利品、`_show_loot_panel()` 弹出面板、`back_button.disabled = true`（未确认前不能离开战斗）。
+3. 失败 → `_hide_loot_panel()` 并确保返回按钮可用。
+
+**UI（`_create_loot_ui()`，代码构建，`_ready()` 中创建）**：
+- 独立 `CanvasLayer`（`LootLayer`，`LOOT_LAYER = 110`，高于激励喊话层的 100），内含全屏半透明遮罩 `loot_modal`（同时用于屏蔽下层点击）与右侧 `loot_panel`。
+- 面板锚点固定为屏幕右边缘（`anchor_left = anchor_right = 1.0`，`offset_left = -300`、`offset_right = -20`）→ 1280 宽下位于 `x = 980~1260`，与居中的胜利面板（`anchors 0.25~0.75`，`x = 320~960`）不重叠；垂直居中（`offset_top = -200`、`offset_bottom = 200`）。
+- 内容：标题「战利品」+ 提示「点击确认将战利品放入物品栏」+ 动态生成的物品行（`_make_loot_row()`：图标 + 名称 + `xN`，悬浮显示道具描述）+ 「确认」按钮。
+
+**确认（`_on_loot_confirm_pressed()`）**：逐条 `ConsumableConfig.add_item()` 入包 → 收起面板 → 解锁返回按钮 → `_build_inventory_panel()` 刷新背包（槽位已满时弹出 `_show_toast()` 提示）。背包右上角图标数量同步 +N，下一场战斗继续累积。
+
+**验证**：`tools/_probe_loot_dogfood.gd`（42 条断言，`PASS=42 FAIL=0`：配置/初始数量/攻击力倍率/1 回合到期/300 次掷取范围/面板锚定与不重叠/结算流程与入包）；`tools/_shot_loot.gd` 非无头渲染一帧存 `res://shot_loot.png` 供肉眼核对。
+
+---
+
+### 7.17 背景音乐（BGM）系统
+
+**素材来源**：游戏自带的 `audio/secondary_banks/music.bank`（原版《暗黑地牢》的 FMOD Studio 音效库，64 首曲目）。Godot **不能直接播放** FMOD bank，因此先用 `tools/extract_fmod_bank.py` 把需要的曲目解码导出成 `audio/bgm/*.ogg`（5 个文件、共约 2.9MB）。
+
+**曲目表（`BgmManager.CUES`）**：
+
+| cue | 前奏（只播一次） | 循环段 | 音量 | 使用场景 |
+|-----|------------------|--------|------|----------|
+| `title` | `mus_theme_intro_v2.ogg`（19.0s） | `mus_theme_loop.ogg`（12.2s） | -8 dB | 闪屏 / 开始菜单 |
+| `map` | — | `Explore_Vaults_Level_1_Loop.ogg`（128s） | -10 dB | 地图探索 |
+| `battle` | `Combat_Level1_Intro.ogg`（3.2s） | `Combat_Level1_Loop1.ogg`（51.2s） | -9 dB | 战斗 |
+
+**管理器（`scripts/core/BgmManager.gd`，Autoload 名 `Bgm`）**：
+- 注册方式：`project.godot` → `[autoload] Bgm="*res://scripts/core/BgmManager.gd"`。因为挂了 Autoload，`change_scene_to_file` 换场景**不会中断音乐**。
+- **两个 `AudioStreamPlayer` 交叉淡入淡出**（`FADE_TIME = 0.8s`）：新曲目淡入、旧曲目淡出后 `stop()`，避免场景切换时硬切。
+- **前奏 → 循环**：`play()` 时若 cue 定义了 `intro`，先播前奏并置 `_awaiting_intro`；`finished` 信号回调里换成 loop 段并 `play()`（原版标题/战斗音乐就是这个结构）。
+- `_load_stream(file, looping)` 在**运行时**设置 `AudioStreamOggVorbis.loop`（OGG 的循环开关不需要改导入参数）。
+- `process_mode = ALWAYS`：即使 `get_tree().paused` 也不停音乐；同 cue 重复 `play()` 不会重头播。
+
+**接入点**：`StartController._ready()` → `title`、`MapController._ready()` → `map`、`BattleController._ready()` → `battle`。
+
+**验证**：`tools/_probe_bgm.gd`（`PASS=42 FAIL=0`）：Autoload 存在、5 个音频都能加载且时长与 bank 内一致、循环标志正确、前奏结束自动接循环、切曲目换播放器、同曲重复调用不重头播、`stop()` 清空当前曲目。
+
+---
+
+### 7.18 战斗音效（SFX）系统
+
+**素材来源**：`audio/secondary_banks/hero_*.bank`（英雄技能音效与通用命中层）、`en_crypts.bank`（骸骨系怪物）、`en_shared.bank`（强盗系怪物）、`ui_dungeon.bank` + `ui_shared.bank`（结算弹窗与按钮音）。这些库是 **FSB5-Vorbis**（与 BGM 的 FADPCM 不同），setup 头外置，提取时需要 `--codebooks tools/_vgmstream/vorbis_codebooks_fsb.h` 补全并重封装成 Ogg（详见 TECH_GUIDE 12.2）。
+
+共提取 **91 个**（5.6MB）：
+
+| 目录 | 内容 | 数量 |
+|------|------|------|
+| `audio/sfx/` | 英雄技能 `char_al_*`（含 `_miss` 挥空版）、通用命中层 `char_share_imp_*`、重击甜化层 | 54 / 3.7MB |
+| `audio/sfx/enemy/` | 怪物技能 `char_en_skl*`（骸骨）/ `char_en_brig*`（强盗） | 31 / 1.7MB |
+| `audio/sfx/ui/` | 结算弹窗 / 按钮音（`ui_dun_loot_popup_battle` 胜利、`ui_shr_window_popup` 战败、`ui_dun_loot_popup_chest` 领奖、`ui_shr_button_click` 点击） | 6 / 0.3MB |
+
+**管理器（`scripts/core/SfxManager.gd`，Autoload 名 `Sfx`）**：
+
+- **12 个 `AudioStreamPlayer` 轮转池** —— 同一帧叠多个音效（施法音 + 命中音、AoE 打多人）不会互相打断；池满时覆盖最旧的一个，比排队延迟手感好。
+- **技能 id → 音效文件** 的表：`HERO_SKILL_SFX`（英雄两层索引 `hero_id → skill_id`）、`MONSTER_SKILL_SFX`（只按 `skill_id`）、`HERO_SKILL_MISS_SFX` / `MONSTER_SKILL_MISS_SFX`（挥空）、`IMPACT_SFX`（武器类型 → 打击层）、`SKILL_IMPACT`（技能 → 武器类型）。
+- **运行时随机化**：每次播放 ±4% 音高、±1.5dB 音量，重复出招不会听起来像复读机。
+- 文件缺失时静默返回 `false`，素材可以逐步补齐而不报错。
+- `process_mode = ALWAYS`：暂停游戏时音效照常播放。
+
+**接口**：
+
+```gdscript
+Sfx.play_skill_cast(skill_id, hero_id)  # 施法音
+Sfx.play_skill_impact(skill_id)         # 命中层（治疗/增益类无条目 → 静音）
+Sfx.play_impact("sword")               # 直接按武器类型播
+Sfx.play_skill_miss(skill_id)           # 挥空音
+Sfx.play("enemy/char_en_sklcom_cudgel", - 9.0)
+```
+
+**战斗接入点（集中两处，不散落到各个分支）**：
+
+| 位置 | 行为 |
+|------|------|
+| `_play_skill_fx_v2()` 开头 | 播施法音，并记下 `_pending_impact_skill`。放在 `SKILL_FX_MAP` 校验**之前** —— 没配 Spine 特效的技能也要有声音 |
+| `_emit_feedback()` 开头 | 用快照差值判断：真掉血 → 叠命中层（AoE 只响一次，命中数越多音量略高）；一点血没掉 → 挥空音；随后清空待结算状态 |
+| `_execute_inspire_betrayal()` | 倒戈一击额外叠一句刀剑命中音 |
+| `_detonate_bomb()` | 炸药引爆 = 重击甜化层 + 火器音 |
+
+**命中层的意义**：英雄技能音本身就是“武器出招”的声音，但“打中了”需要一层统一的肉体/金属反馈才能听起来“落实”。因此每次成功掉血都会再叠一层 `char_share_imp_*`（刀/斧/锤/小刀/盾/枪/箭/光魔法/暗魔法/重击）。
+
+**验证**：`tools/_probe_sfx_battle.gd`（`PASS=50 FAIL=0`）：表↔文件一致性、`SKILL_FX_MAP` 37 个技能全覆盖、战斗内真播到正确文件、掉血/零伤害分流、治疗不误响、池不扩容。
+
+---
+
 ## 8. 扩展指南
 
 ### 添加新英雄
@@ -2180,12 +2669,19 @@ while 循环驱动（在 _get_next_actor() 内）：
     "max_hp": 30,
     "attack": 8,
     "speed": 5,
-    "speed_delta_base": 0
+    "speed_delta_base": 0,
+    "skills": ["skeleton_melee"]   # 技能 id 数组；空数组 = 永不行动（惰性单位）
 }
 ```
-再将 ID 加入 `CURRENT_ENCOUNTER`（或在关卡切换时覆盖该数组）。`BattleController` 无需修改。
+然后在 `BattleController.MONSTER_ANIM_CONFIG` 中登记一条（`{base, dir, map}`）——渲染白名单与 `_load_monster_anim()` 都读这张表，**无需改函数分支**：
+```gdscript
+"skeleton": {"base": SKELETON_ANIM_BASE, "dir": SKELETON_PNG_DIR, "map": SKELETON_ANIM_MAP},
+```
+最后将 ID 加入 `CURRENT_ENCOUNTER`（或在关卡切换时覆盖该数组，Boss 房用 `DungeonMap.BOSS_ENCOUNTER`）。
 
-> **注意**：怪物站位由其在 `CURRENT_ENCOUNTER` 数组中的下标决定（下标 0 = 1号位）。英雄技能的 `target_positions` 将基于此下标+1进行过滤。
+> **注意**：怪物站位由其在遭遇数组中的下标决定（下标 0 = 1号位）。英雄技能的 `target_positions` 将基于此下标+1进行过滤。
+> 可选字段：`inert`（惰性，永不进入行动队列）、`life_link`（生命链接：该怪阵亡时，`life_link` 指向它的怪物一同倒下）。
+> 若新怪物的 PNG 尚未导入（控制台报 `No loader found for resource: ...png`），先跑一次 `godot --headless --path <项目> --import` 或打开一次编辑器。
 
 ### 调整遭遇配置
 ```gdscript
@@ -2202,7 +2698,7 @@ MonsterConfig.CURRENT_ENCOUNTER = ["goblin", "troll", "skeleton"]
 ### 扩展 ActionResolver
 所有战斗数值逻辑集中在 `ActionResolver.gd`（纯静态方法），在此添加：
 - `apply_status(target, status_id)` — 施加状态
-- `tick_statuses(unit)` — 回合结束时结算 DoT 等持续效果
+- `tick_statuses(unit)` — 在**该单位自己行动时**结算 DoT 伤害与所有状态的持续时间（回合开始不结算，详见 §7.10）
 - `calculate_crit(actor, skill_data)` — 暴击判定
 
 ---
@@ -2254,7 +2750,13 @@ MonsterConfig.CURRENT_ENCOUNTER = ["goblin", "troll", "skeleton"]
 4. nonEssential bool     — 1 字节；若为 true 则跟随 fps(float) + imagesPath(string)
 5. bone_count varint     — 骨骼数量（idle.skel = 49）
    每根骨骼: name, parent_raw(varint,0=root), x,y,sx,sy,rotation,length(6 floats), flip_x,flip_y,inherit_scale,inherit_rotation(4 bools)
-6. ik_count varint       — IK 约束数量（Darkest Dungeon = 0）
+6. ik_count varint       — IK 约束数量（十字军 = 0；训犬师 idle/walk = 5、combat = 4）
+   每条约束: name(string) + bonesCount(varint) + bones[boneIdx...] + target(varint) + mix(float) + bendDirection(1 字节有符号)
+   ⚠️ 详情块紧跟在名称之后，**必须完整消费**，否则后续 slot/skin/animation 全线错位
+   ⚠️ bendDirection 是**单字节有符号值**，不能用 varint 读：bend=+1 写作 01（两种读法同为 1 字节，
+      因此该 bug 长期隐形），但 bend=-1 写作 FF，varint 会因高位为 1 而多吃 1 字节 →
+      后续全部段落偏移 1 字节（症状：插槽名乱码 + attachments=0 + anims=0 + 刷屏 NUL 报错）。
+      实测受害者：brigand_fuseman.sprite.combat.skel（left_leg_IK 的 bend 为 -1）。
 7. slot_count varint     — 槽位数量（idle.skel = 31）
    每个槽位: name(string), bone_index(varint), color(4 bytes), attachment(string), blendMode(1 byte)
 8. default skin:
@@ -2401,6 +2903,7 @@ Transform2D(Vector2(0, 1), Vector2(-1, 0), Vector2.ZERO)  # +90° CW
    - 若 `parent_index < 0`（根骨骼）：`world_t[i] = local_t[i]`
    - 否则（子骨骼）：`world_t[i] = world_t[parent_index] × local_t[i]`
    - 结果：每根骨骼的世界坐标系变换存入 `_bone_world[]` 数组
+   - **越界防护**：`parent_index` 越界（`< 0` 或 `>= _bone_world.size()`）时回退为自身局部变换，避免骨骼数据异常导致 `Out of bounds` 崩溃
 
 3. **更新精灵渲染**：
    - 遍历所有槽位 `slots[si]`
@@ -2425,6 +2928,7 @@ Transform2D(Vector2(0, 1), Vector2(-1, 0), Vector2.ZERO)  # +90° CW
            origin = (att_x, att_y)
        )
        ```
+     - **越界防护**：`slots[si].bone_index` 越界时 `bone_t` 回退为 `Transform2D.IDENTITY`，保证异常骨骼索引不致崩溃
      - 合成最终变换：`world_t = bone_t × att_t`
      - **Atlas 旋转补偿**：若 `region.rotate = true`，后乘 +90° CW 补偿矩阵
        ```
@@ -2557,6 +3061,160 @@ sp.play("idle")
 
 ---
 
-**文档版本**：v3.0  
-**最后更新**：2026 年 6 月 24 日  
+### 4.19 map/DungeonMap.gd
+
+**类名**：`DungeonMap`  
+**类继承**：`extends Node`  
+**模式**：静态单例（class_name + static 变量/方法）  
+**职责**：地图尺寸配置、随机地图生成、房间/走廊/遭遇数据管理。
+
+**静态变量**：
+
+| 变量 | 说明 |
+|------|------|
+| `MAP_SIZE` | 地图尺寸：`"small"` / `"medium"` / `"large"` |
+| `BRANCHINESS` | 扩散倾向：0=一条路径，1=四通八达，默认 0.5 |
+| `MAP_GRID` | 随机生成的二维数组（`"start"` / `"normal"` / `"boss"` / `""`） |
+| `START_ROOM` / `BOSS_ROOM` | 起始房 / Boss 房 id |
+| `current_room` / `cleared_rooms` | 当前房间 / 已清除房间列表 |
+| `ENCOUNTER_POOL` / `BOSS_ENCOUNTER` | 随机遭遇池 / Boss 房遭遇 |
+
+**关键方法**：
+
+| 方法 | 职责 |
+|------|------|
+| `set_size(key)` | 设置地图尺寸 |
+| `set_branchiness(value)` | 设置扩散倾向（0~1） |
+| `reset_run()` | 重新随机生成一张当前尺寸的地图 |
+| `roll_encounter(room_id)` | 为指定房间掷出随机遭遇（Boss 房返回 BOSS_ENCOUNTER） |
+| `get_grid_cols()` / `get_grid_rows()` | 返回网格行列数 |
+| `get_all_room_ids()` / `get_room(id)` | 供渲染层遍历房间 |
+| `are_connected(a, b)` / `get_connected_rooms(id)` | 走廊连通查询 |
+| `is_cleared(id)` / `mark_cleared(id)` | 已清除房间查询/标记 |
+| `is_boss_room(id)` / `move_to(id)` | Boss 判定 / 移动当前房间 |
+
+**生成算法（`_generate_map()`）**：
+1. 全图随机选一个格子作为起点。
+2. 从已有房间向四周扩散（线性/分支由 `BRANCHINESS` 决定），直到达到目标房间数（小 10 / 中 15 / 大 20）。
+3. 用 BFS 计算各房间到起点的行走步数，选最远的房间作为 Boss。
+
+**边界防护（`_empty_neighbors()`）**：`_cell_kind()` 对「空格」和「地图外」都返回 `""`，若 `_empty_neighbors()` 不先判边界，会把地图外格子当成可用空格，导致 `_set_cell()` 以越界下标（如小地图第 5 行/列）写入而报 `Invalid assignment of index '5'`。现已显式校验 `nr` / `nc` 是否在 `MAP_GRID` 范围内，越界邻居直接跳过。
+
+---
+
+### 4.20 map/MapController.gd
+
+**类继承**：`extends Node`  
+**挂载场景**：`scenes/map/Map.tscn`  
+**职责**：渲染随机生成的地图（房间方块 + 走廊），处理房间点击与场景跳转。
+
+**关键函数**：
+
+| 函数 | 职责 |
+|------|------|
+| `_build_ui()` | 构建全屏 UI；地图内容放入带 `clip_contents` 的 `MapViewport`，其下 `MapRoot(Node2D)` 负责平移 |
+| `_draw_corridors()` | 用 `Line2D` 绘制房间之间的走廊（挂到 `MapRoot`） |
+| `_refresh_rooms(animate)` | 重建房间按钮层（移动已清房后刷新），末尾重新居中 |
+| `_center_on_current_room(animate)` | 整张地图平移 `视口中心 - 当前房间中心`，使当前房间永远在视野正中（补间 0.28s） |
+| `_create_room_button()` | 生成单个房间按钮（当前/已清/有敌/禁用样式） |
+| `_update_status()` | 更新当前房间与相邻房间状态文本 |
+| `_on_room_clicked(id)` | 已清房直接移动；未清房掷遭遇并跳转战斗 |
+| `_on_abandon_pressed()` | 放弃本局，返回开始画面 |
+
+**显示缩放**：固定 `ROOM_SIZE=76` / `STEP_X=150` / `STEP_Y=126`（不再按网格缩到刚好装下整张图）；中/大地图超出视口的部分被裁掉，靠平移查看（视野外的房间按钮本来就 `disabled`，而相邻房间必紧贴当前房间、永远可见）。窗口尺寸变化时视口宽度跟随并重新居中。
+
+---
+
+## 9. 暗黑地牢原版地图系统
+
+### 9.1 设计目标
+
+地图由一个个**正方形的房间**组成，房间之间由**走廊**相连。玩家在地图中只能点击「与当前房间相连且不是当前房间」的其它房间，点击后进入该房间并触发一场**新的随机战斗**。地图分为**小 / 中 / 大**三级，在初始界面选择，每局随机生成。
+
+### 9.2 地图数据结构
+
+- **地图尺寸**（`MAP_SIZE`）：`"small"`（5×5，10 房间）、`"medium"`（7×7，15 房间）、`"large"`（9×9，20 房间）。
+- **`scripts/map/DungeonMap.gd`**（`class_name DungeonMap`，静态单例）：
+  - `MAP_GRID`：随机生成的二维数组，元素为房间类型（`"start"` / `"normal"` / `"boss"`，空字符串表示无房间）。
+  - 生成规则：全图随机选一个格子作为起点；从已有房间向四周扩散补齐到目标房间数；最后用 BFS 计算各房间到起点的行走步数，选最远的房间作为 Boss。
+  - 扩散倾向 `BRANCHINESS`（可调，`set_branchiness()`）：`0`=一条路径（线性），`1`=四通八达（分支），默认 `0.5`。
+  - 自动生成的 `_rooms`：每间房含 `name`（仅分「起始 / 战斗 / Boss」）、`kind`、`col`/`row`、`connections`（上下左右相邻即相连）。
+  - `START_ROOM` / `BOSS_ROOM` / `current_room` / `cleared_rooms`：起始房间、Boss 房间、当前房间、已清除房间列表。
+  - `ENCOUNTER_POOL` / `BOSS_ENCOUNTER`：随机遭遇池与 Boss 房固定遭遇。
+  - 关键方法：`set_size()`、`set_branchiness()`、`get_grid_cols()`、`get_grid_rows()`、`get_all_room_ids()`、`get_room()`、`are_connected()`、`get_connected_rooms()`、`is_cleared()`、`mark_cleared()`、`is_boss_room()`、`move_to()`、`reset_run()`、`roll_encounter()`。
+
+### 9.3 场景与流程
+
+- **`scenes/start/Start.tscn` + `scripts/main/StartController.gd`**：开始界面先闪 `demo_splash.png`，再进入原版风格主菜单（辉光底板 + 宅邸剪影 + 流云 + DEMO 标志 + 「SMALL / MEDIUM / LARGE」尺寸选择 + START 按钮）；点 START 写入固定编队（十字军/强盗/神秘学者/训犬师）并直接进入地图（**不再经过编队选择**）。
+- **`scenes/map/Map.tscn`** + **`scripts/map/MapController.gd`**：渲染房间方块（`Button`）与走廊（`Line2D`）；地图内容挂在可平移的 `MapRoot(Node2D)` 下、放在开启 `clip_contents` 的 `MapViewport` 里，**当前房间永远被平移到视野正中**（换房/窗口尺寸变化时重新居中，见 §4.20）；当前房间绿色高亮、相邻可探索房间橙色高亮、未连通房间灰色禁用。
+- 流程变更：`开始界面（闪屏 → 主菜单选尺寸）→ Map → Battle → (胜利) Map / (失败·通关) 开始界面`。
+- `MapController._on_room_clicked()`：点击相邻房间 → 已清除房间直接移动（不刷怪）；未清除房间掷出随机遭遇写入 `MonsterConfig.CURRENT_ENCOUNTER` → `DungeonMap.move_to(room_id)` → 跳转 `Battle.tscn`。
+- `BattleController` 胜利后调用 `DungeonMap.mark_cleared(current_room)` 与 `HeroConfig.persist_party_after_battle(heroes)`；普通胜利 `back_button` 文案为 `Return to Map`，失败为 `Back to Start`，击败 Boss 房显示 `Run Complete!` 并返回开始画面（整局通关）。
+
+### 9.4 队伍状态跨房间持久化
+
+- `HeroConfig.PARTY_STATES`：按 `CURRENT_TEAM` 槽位对齐的持久状态数组，每项为 `{}`（空槽）、`{"dead": true}`（阵亡）或
+  `{"hp", "stress", "is_death_door", "is_afflicted", "is_virtuous"}`（存活）——折磨 / 美德与压力一起跨战斗保留（见 §7.14）。
+- 每次从开始界面点 START 开新局时调用 `HeroConfig.reset_party_state()` 与 `DungeonMap.reset_run()` 重置进度。
+- `BattleController._setup_battle()` 从 `HeroConfig.get_team_heroes()` 读取持久化后的 hp/stress/is_death_door，实现跨房间连续探索。
+
+---
+
+**文档版本**：v4.1  
+**最后更新**：2026 年 9 月 29 日  
 **引擎版本**：Godot 4.6  
+
+**v4.1 更新内容**：
+- 新增**战斗结算界面**（§7.19）：胜利 / 远征终结 / 战败三种结局共用一张卡片（全屏暗幕 + 上下黑边 + 660×430 卡片），带徽记、结局描述、4 行战绩与入场动画
+- 旧版只是一个素面 `Panel` + `Label` + `Button`；现改为 `EndLayer(CanvasLayer=105)` + `_create_end_battle_ui()` 代码构建，**解决了角色 SpinePlayer 盖住结算面板的问题**
+- `Sfx` 新增 UI 音效表（`ui/` 子目录）：胜利 / 远征终结 / 战败 / 领奖 / 点击 各有专属音效；音效素材总数 85 → **91 个**
+- 新探针 `tools/_probe_end_battle.gd`（`PASS=80 FAIL=0`）；15 个探针全量回归通过（580 条断言）
+
+**v4.0 更新内容**：
+- **新增战斗音效系统**（§7.18）：Autoload `Sfx`（`scripts/core/SfxManager.gd`）+ 12 个播放器轮转池 + 技能 id → 音效表
+- 战斗挂点只有两处：`_play_skill_fx_v2()` 播施法音、`_emit_feedback()` 按真实掉血分流（掉血 → 命中层 / 零伤害 → 挥空音）；倒戈一击与炸药引爆另有专用音
+- 音效素材扩到 **85 个 / 5.5MB**：通用命中层 10 个（`char_share_imp_*`）+ 怪物技能 31 个（骸骨系 `char_en_skl*` / 强盗系 `char_en_brig*`）
+- 新增探针 `tools/_probe_sfx_battle.gd`（`PASS=50 FAIL=0`）；14 个探针全量回归通过
+
+**v3.9 更新内容**：
+- 提取工具支持 **FSB5-Vorbis**（音效库）：按 `setup_id` 从 vgmstream 的 codebook 表补全 setup 头，重建识别/注释头后**重封装为 Ogg**（不重新编码）
+- 提取四个英雄的技能音效 44 个 → `audio/sfx/`（3.4MB，含 `_miss` 挥空版；与 16 个技能一一对应）
+- 新增校验探针 `tools/_probe_sfx.gd`（`PASS=4 FAIL=0`）
+
+**v3.8 更新内容**：
+- **新增背景音乐系统**（§7.17）：Autoload `Bgm`（`scripts/core/BgmManager.gd`）+ 两个播放器交叉淡入淡出 + 前奏→循环编排；开始界面/地图/战斗各自切曲
+- 新增提取工具 `tools/extract_fmod_bank.py`：解析 FMOD FSB5 bank（含纯 Python 的 FADPCM 解码），把 `audio/secondary_banks/music.bank` 中的曲目导出为 `audio/bgm/*.ogg`
+- 提取了 5 个 BGM 文件（标题前奏/标题循环/地图探索/战斗前奏/战斗循环，共 ~2.9MB）
+
+**v3.7 更新内容**：
+- 激励回应窗口改为**玩家点击「确定」后才收起并推进回合**（新增 `reply_confirmed` 信号 + `_on_reply_confirm_pressed()`，不再 2.5s 自动散去；聆听阶段隐藏按钮）
+- 激励结果**更看重玩家原话**：新增本地语气分析 `evaluate_input_tone()` / `input_tone_label()`（词表四档，评分 `[-4,+4]`），参与 Mock 权重修正并写入 System Prompt（§4.13 / TECH_GUIDE 8.4）
+- 实测（hp45/stress0）：贬低 “你这废物…懦夫…闭嘴” → 加压 66%、倒戈 24%、减压仅 6%；真诚鼓舞 → 减压 75%、增益 21%、加压 4%
+- 回应面板加高到 240，避免「确定」按钮溢出面板
+
+**v3.6 更新内容**：
+- 重做游戏开始界面（§4.8）：`demo_splash.png` 闪屏（点击/按键/2.4s 跳过）→ 复刻原版前端的主菜单（`title_bg` 下半屏辉光 + `title_house` 宅邸剪影 + `sky01/02` 流云 + DEMO 标志 + 描金按钮），素材全部取自 `res://fe_flow/`，版式沿用 `fe_flow.layout.darkest` 原始坐标
+- **移除编队选择功能**：删除 `scenes/main/TeamSelect.tscn` 与 `scripts/main/TeamSelectController.gd`；开局固定为十字军 / 强盗 / 神秘学者 / 训犬师（`StartController.FIXED_TEAM`，§4.9）
+- 流程变更：`开始界面（闪屏 → 菜单）→ Map → Battle → 胜利 Map / 失败 · 通关 开始界面`
+- 新增探针 `tools/_probe_start_menu.gd`（`PASS=37 FAIL=0`）与截图工具 `tools/_shot_start.gd`
+
+**v3.5 更新内容**：
+- 伤害公式拆分为**两个增益乘区**：`attack_mult`（美德激励 / 战意高涨）**彼此加算**（1.2 + 1.2 = ×1.4），`damage_mult`（狗粮）**乘算**在最后（×1.4 × 1.2 = ×1.68）
+- 新增 `ActionResolver.get_damage_multiplier()`；`get_attack_multiplier()` 由“取最大值”改为“加算求和”（并用 `snappedf` 抹平浮点误差，避免 int 截断少 1 点伤害）
+- `dogfood_buff` 由 `attack_mult` 改为 `damage_mult`（狗粮 = 加伤害，属乘算乘区）
+- 验证探针：`tools/_probe_buff_zones.gd`（`PASS=15 FAIL=0`）
+
+**v3.4 更新内容**：
+- 实装 AI 激励喊话的 ② `[BUFF]` 增益分支（此前为占位，会显示“分支暂未开放、本次不产生效果”）：现在为英雄附加新状态 `inspired`（战意高涨，攻击力 +20%，持续 3 回合）
+- 新增 `INSPIRE_BUFF_STATUS` / `INSPIRE_BUFF_ROUNDS` 常量与 `StatusConfig.inspired`
+
+**v3.3 更新内容**：
+- 新增消耗品「狗粮 Dog Food」：使用后为当前行动英雄附加 `dogfood_buff`（伤害 +20%，持续 1 回合），初始发放 2 个（§4.7 / §7.8）
+- 新增战斗结算（战利品）步骤：胜利后右侧面板展示 1~4 食物 / 0~1 绷带 / 0~1 狗粮，点击确认入包（§7.16）
+- 消耗品配置新增 `buff_status` / `buff_duration` 字段，tooltip 效果行同步支持「附加<状态名>（N 回合）」
+
+**v3.2 更新内容**：
+- 新增消耗品背包系统（ConsumableConfig + 战斗内 16 格渲染/左键使用），修复消耗品按钮命中测试失效问题
+- 新增技能 / 消耗品悬浮提示系统（描述 + 使用/目标位置 + 效果）
+- 地图生成越界修复（`_empty_neighbors` 边界校验）
+- SpinePlayer / `_update_selected_text` / `_emit_feedback` 数组越界防护

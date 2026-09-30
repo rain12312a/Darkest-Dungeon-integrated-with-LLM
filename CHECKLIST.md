@@ -50,8 +50,7 @@
   - [ ] 在 `_create_spine_player_for_hero()` 中调用 `_load_hero_anim()`
 
 - [ ] **测试**
-  - [ ] 游戏启动 → 编队选择 → 新英雄出现在列表中
-  - [ ] 选择新英雄 → 进入战斗 → 头像、技能图标、动画正常显示
+  - [ ] 游戏启动 → 把新英雄 hero_id 填进 `StartController.FIXED_TEAM` → 进入战斗
   - [ ] 选择技能 → 伤害计算正确
 
 ---
@@ -95,7 +94,7 @@
   - [ ] 在 `_create_spine_player_for_monster()` 中调用 `_load_monster_anim()`
 
 - [ ] **测试**
-  - [ ] 游戏启动 → 编队选择 → 进入战斗
+  - [ ] 游戏启动 → 点 START（固定编队）→ 进入战斗
   - [ ] 新怪物在右侧对应位置显示
   - [ ] 动画正常播放，血条显示正确
 
@@ -120,6 +119,43 @@
   - [ ] 进入战斗，当该英雄行动时查看技能按钮
   - [ ] 点击技能 → 目标选择正常显示
   - [ ] 选择目标 → 伤害/治疗计算正确
+
+---
+
+## 技能特效与音效
+
+新增技能时，**特效**与**音效**是两张独立的表，都要登记（漏登记不会报错，只会“有动作没声音”或“有声音没画面”）：
+
+- [ ] **特效**：`BattleController.SKILL_FX_MAP` 增加 `"skill_id": { "caster_fx", "target_fx", "caster_anim" }`
+- [ ] **施法音**：`SfxManager` 里二选一
+  - [ ] 英雄技能 → `HERO_SKILL_SFX["<hero_id>"]["<skill_id>"] = "char_al_<英雄缩写>_<技能>"`
+  - [ ] 怪物技能 → `MONSTER_SKILL_SFX["<skill_id>"] = "enemy/char_en_<怪缩写>_<技能>"`（`enemy/` 前缀表示去 `audio/sfx/enemy/`）
+- [ ] **命中层**：`SKILL_IMPACT["<skill_id>"] = "sword" | "axe" | "hammer" | "knife" | "shield" | "gun" | "arrow" | "magic_light" | "magic_dark"`
+  - 治疗 / 增益 / 召唤类**不要**加，留空即静音（这是刻意的：打不死人的招式不该响打击音）
+- [ ] **挥空音（可选）**：`HERO_SKILL_MISS_SFX` / `MONSTER_SKILL_MISS_SFX`（该技能零伤害时播）
+- [ ] **音效素材**：从 bank 提取
+  ```powershell
+  python tools/extract_fmod_bank.py --list audio/secondary_banks/hero_<hero>.bank       # 先查名字
+  python tools/extract_fmod_bank.py --bank audio/secondary_banks/hero_<hero>.bank --out audio/sfx --track char_al_<子串>
+  ```
+  怪物音效源：骸骨系 → `en_crypts.bank`，强盗系 → `en_shared.bank`，输出目录加 `--out audio/sfx/enemy`
+  （Vorbis bank 需要 `--codebooks tools/_vgmstream/vorbis_codebooks_fsb.h`，工具的默认值已指向它）
+- [ ] **验证**：`godot --headless --path . --script res://tools/_probe_sfx_battle.gd`
+  - 探针会逐条比对“表里登记的文件是否都存在”以及“`SKILL_FX_MAP` 里每个技能是否都有施法音”，漏登记会直接 FAIL 并打印缺失项
+
+---
+
+## 结算界面（胜利 / 远征终结 / 战败）
+
+三种结局共用一张卡片，改文案或徽记只需动 `BattleController` 的两处：
+
+- [ ] **文案与按钮**：`_refresh_end_battle_content()` 的 `match _end_state` 分支（`victory` / `run_complete` / `defeat`）
+- [ ] **徽记素材**：`END_ART_BY_STATE` 常量（`victory` → `overlays/quest_complete.png`；`run_complete` → `panels/quest_return_to_hamlet.png`；`defeat` → `panels/seal.affliction.png`）
+- [ ] **战绩行**：`_fill_end_stats()`（目前是回合数 / 存活英雄 / 剩余生命 / 平均压力）
+- [ ] **卡片尺寸**：`END_CARD_SIZE`（改宽了要同步检查与右侧战利品面板 `x=980~1260` 是否还错得开）
+- [ ] **层级**：结算卡片固定在 `CanvasLayer(105)`。**不要**为了"盖住角色"去调 `z_index` —— 角色的 SpinePlayer 挂在 Battle 根节点且 `z_index = 10`，只有独立 CanvasLayer 才盖得住
+- [ ] **验证**：`godot --headless --path . --script res://tools/_probe_end_battle.gd`（`PASS=80`）
+- [ ] 想改视觉：`godot --path . --script res://tools/_shot_end_battle.gd` 会生成三种结局的截图
 
 ---
 
@@ -169,7 +205,8 @@ monsters/new_monster/
 - `scripts/data/HeroConfig.gd` — 添加英雄
 - `scripts/data/SkillConfig.gd` — 添加技能
 - `scripts/data/MonsterConfig.gd` — 添加怪物
-- `scripts/battle/BattleController.gd` — 添加动画映射
+- `scripts/battle/BattleController.gd` — 添加动画映射与 `SKILL_FX_MAP` 特效
+- `scripts/core/SfxManager.gd` — 添加施法音 / 命中层（见「技能特效与音效」）
 
 ---
 
@@ -177,9 +214,12 @@ monsters/new_monster/
 
 | 错误 | 检查清单 |
 |------|---------|
-| 英雄不出现在编队选择 | ✓ HeroConfig 中已注册 ✓ 拼写无误 ✓ 脚本已保存 |
+| 英雄不出现在队伍里 | ✓ HeroConfig 中已注册 ✓ 已加入 `StartController.FIXED_TEAM` ✓ 拼写无误 ✓ 脚本已保存 |
 | 技能图标不显示 | ✓ 文件名正确（`hero.ability.one.png`） ✓ 文件存在 ✓ SkillConfig 中已定义 |
 | 动画不播放 | ✓ 文件路径正确 ✓ BattleController 中已映射 ✓ 动画名称拼写无误 |
+| 技能有画面没声音 | ✓ `SfxManager.HERO_SKILL_SFX` / `MONSTER_SKILL_SFX` 中已登记 ✓ 音效文件已提取到 `audio/sfx/`（怪物在 `audio/sfx/enemy/`） ✓ 跑 `_probe_sfx_battle.gd` 看是哪条缺失 |
+| 打中了却没有打击声 | ✓ `SKILL_IMPACT` 中该技能已指定武器类型（治疗/增益类故意留空） |
+| 治疗技却响了打击音 | ✓ `SKILL_IMPACT` 里该技能应该**没有**条目 |
 | 怪物不出现 | ✓ MonsterConfig 中已注册 ✓ CURRENT_ENCOUNTER 中已添加 ✓ 动画文件存在 |
 | 按钮无法点击 | ✓ 信号连接正确（`.bind()` 和 `CONNECT_DEFERRED`） ✓ 回调函数存在 |
 

@@ -7,13 +7,9 @@
 3. [游戏流程](#3-游戏流程)
 4. [脚本函数详解](#4-脚本函数详解)
    - [4.1 core/GameState.gd](#41-coregamestate)
-   - [4.2 core/Database.gd](#42-coredatabasegd)
    - [4.3 data/HeroConfig.gd](#43-dataheroconfiggd)
    - [4.4 data/SkillConfig.gd](#44-dataskillconfiggd)
    - [4.5 data/MonsterConfig.gd](#45-datamonsterconfig)
-   - [4.6 data/CharacterData.gd](#46-datacharacterdatagd)
-   - [4.6 data/SkillData.gd](#46-dataskilldatagd)
-   - [4.7 data/StatusData.gd](#47-datastatusdatagd)
    - [4.7 data/ConsumableConfig.gd](#47-dataconsumableconfiggd)
    - [4.8 main/StartController.gd](#48-mainstartcontrollergd)
    - [4.9 固定编队（原编队选择功能已移除）](#49-固定编队原编队选择功能已移除)
@@ -117,11 +113,11 @@ darkdungeon/
 │       └── ui/                          #   结算弹窗 / 按钮音（6 个）
 │
 │
-├── data/                                # JSON 数据文件目录
-│   ├── characters.json                  # 角色静态数据（由 Database.gd 加载）
-│   ├── skills.json                      # 技能静态数据（由 Database.gd 加载）
-│   ├── statuses.json                    # 状态效果数据（由 Database.gd 加载）
-│   └── towns.json                       # 城镇数据（由 Database.gd 加载）
+├── data/                                # JSON 数据文件目录（早期“数据驱动”预留，当前运行时不读取）
+│   ├── characters.json                  # 角色静态数据（当前运行时由 HeroConfig.gd 管理）
+│   ├── skills.json                      # 技能静态数据（当前运行时由 SkillConfig.gd 管理）
+│   ├── statuses.json                    # 状态效果数据（预留）
+│   └── towns.json                       # 城镇数据（预留）
 │
 ├── scenes/                              # Godot 场景文件目录（.tscn）
 │   ├── main/
@@ -151,8 +147,9 @@ darkdungeon/
     ├── core/
     │   ├── GameState.gd                 # 全局场景管理器，处理场景切换逻辑
     │   ├── GameState.gd.uid             # Godot UID 资源引用文件（自动生成）
-    │   ├── Database.gd                  # JSON 数据加载工具类
-    │   └── Database.gd.uid
+    │   ├── BgmManager.gd                # Autoload Bgm：BGM 交叉淡入淡出（前奏 → 循环）
+    │   ├── SfxManager.gd                # Autoload Sfx：技能 / 命中 / UI 音效轮转池
+    │   └── DisplayManager.gd            # Autoload Display：F11 / Alt+Enter 全屏切换
     │
     ├── data/
     │   ├── HeroConfig.gd                # 英雄静态配置（全局单例模式，含当前编队状态）
@@ -160,12 +157,13 @@ darkdungeon/
     │   ├── SkillConfig.gd               # 技能静态配置（全局单例模式）
     │   ├── SkillConfig.gd.uid
     │   ├── MonsterConfig.gd             # 怪物模板配置（全局单例模式，含遭遇列表）
-    │   ├── CharacterData.gd             # 角色 Resource 数据类（供 Godot 编辑器使用）
-    │   ├── CharacterData.gd.uid
-    │   ├── SkillData.gd                 # 技能 Resource 数据类（供 Godot 编辑器使用）
-    │   ├── SkillData.gd.uid
-    │   ├── StatusData.gd                # 状态 Resource 数据类（供 Godot 编辑器使用）
-    │   └── StatusData.gd.uid
+    │   ├── MonsterConfig.gd.uid
+    │   ├── StatusConfig.gd              # 状态效果定义（DoT / 晕眩 / 标记 / 守护 / 增益）
+    │   ├── StatusConfig.gd.uid
+    │   ├── StressConfig.gd              # 压力系统数值（折磨 / 美德 / 失控）
+    │   ├── StressConfig.gd.uid
+    │   ├── ConsumableConfig.gd          # 消耗品（食物 / 绷带 / 狗粮）与背包
+    │   └── ConsumableConfig.gd.uid
     │
     ├── main/
     │   ├── StartController.gd           # 开始界面（闪屏 + 原版风格主菜单 + 固定编队开局）
@@ -324,56 +322,6 @@ darkdungeon/
 
 ---
 
-### 4.2 core/Database.gd
-
-**类继承**：`extends Node`  
-**职责**：提供从本地 JSON 文件读取游戏数据的工具方法。该类不自动加载数据，需要由外部调用。
-
-**常量**：
-
-| 常量名 | 值 | 说明 |
-|--------|-----|------|
-| `DATA_DIR` | `"res://data"` | JSON 数据文件所在目录 |
-
----
-
-#### `load_json(path: String) -> Dictionary`
-- **参数**：`path` — JSON 文件的完整资源路径
-- **返回值**：解析后的 Dictionary；文件不存在或解析失败时返回空 `{}`
-- **功能**：通用 JSON 文件读取方法
-- **流程**：
-  1. 用 `FileAccess.open(path, FileAccess.READ)` 打开文件
-  2. 文件为 null 时直接返回 `{}`
-  3. 调用 `file.get_as_text()` 读取全部文本
-  4. 用 `JSON.parse_string(text)` 解析
-  5. 检查结果类型为 `TYPE_DICTIONARY` 后返回，否则返回 `{}`
-
----
-
-#### `get_characters() -> Dictionary`
-- **功能**：加载角色数据文件
-- **返回值**：`data/characters.json` 的内容
-
----
-
-#### `get_skills() -> Dictionary`
-- **功能**：加载技能数据文件
-- **返回值**：`data/skills.json` 的内容
-
----
-
-#### `get_statuses() -> Dictionary`
-- **功能**：加载状态效果数据文件
-- **返回值**：`data/statuses.json` 的内容
-
----
-
-#### `get_towns() -> Dictionary`
-- **功能**：加载城镇数据文件
-- **返回值**：`data/towns.json` 的内容
-
----
-
 ### 4.3 data/HeroConfig.gd
 
 **类名**：`HeroConfig`  
@@ -520,71 +468,6 @@ static var CURRENT_TEAM: Array[String] = ["crusader", "highwayman", "occultist",
 #### `static skill_exists(skill_id: String) -> bool`
 - **参数**：`skill_id` — 技能唯一标识符
 - **返回值**：技能是否存在于 `SKILLS` 字典中
-
----
-
-### 4.5 data/CharacterData.gd
-
-**类名**：`CharacterData`  
-**类继承**：`extends Resource`  
-**职责**：Godot Resource 数据类，用于编辑器内创建角色数据资源文件（.tres）。与运行时 HeroConfig 并行存在，面向编辑器工作流。
-
-**导出属性**（`@export`）：
-
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `id` | String | 角色唯一标识符 |
-| `name` | String | 角色名称 |
-| `max_hp` | int | 最大血量 |
-| `speed` | int | 基础速度 |
-| `stress_threshold` | int | 压力阈值（默认 100，预留字段） |
-| `skills` | Array[String] | 技能 ID 列表 |
-| `statuses` | Array[String] | 初始状态列表（预留） |
-
-> 该类无自定义方法，仅作数据容器。
-
----
-
-### 4.6 data/SkillData.gd
-
-**类名**：`SkillData`  
-**类继承**：`extends Resource`  
-**职责**：Godot Resource 数据类，用于编辑器内创建技能数据资源文件。
-
-**导出属性**（`@export`）：
-
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `id` | String | 技能唯一标识符 |
-| `name` | String | 技能名称 |
-| `type` | String | 技能类型字符串 |
-| `power` | int | 技能威力基础值 |
-| `hit` | int | 命中率（默认 100，预留） |
-| `stress_delta` | int | 施加的压力变化量（预留） |
-| `target` | String | 目标类型字符串 |
-| `cooldown` | int | 冷却回合数（预留） |
-
-> 该类无自定义方法，仅作数据容器。
-
----
-
-### 4.7 data/StatusData.gd
-
-**类名**：`StatusData`  
-**类继承**：`extends Resource`  
-**职责**：Godot Resource 数据类，用于编辑器内创建状态效果数据资源。
-
-**导出属性**（`@export`）：
-
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `id` | String | 状态唯一标识符 |
-| `name` | String | 状态名称 |
-| `type` | String | 状态类型（如 `"dot"`、`"buff"` 等） |
-| `duration` | int | 持续回合数 |
-| `effects` | Dictionary | 状态具体效果（键值对，预留） |
-
-> 该类无自定义方法，仅作数据容器。
 
 ---
 
@@ -1994,16 +1877,20 @@ static var CURRENT_ENCOUNTER: Array[String] = ["skeleton_common", "skeleton_defe
 ## 5. 数据文件说明
 
 ### data/characters.json
-由 `Database.get_characters()` 加载，供 `CharacterData` 资源使用。当前游戏运行时英雄数据由 `HeroConfig.gd` 静态管理，此文件预留用于未来的数据驱动扩展。
+角色静态数据（预留）。当前游戏运行时英雄数据由 `HeroConfig.gd` 静态管理。
 
 ### data/skills.json
-由 `Database.get_skills()` 加载。当前游戏运行时技能数据由 `SkillConfig.gd` 静态管理。
+技能静态数据（预留）。当前游戏运行时技能数据由 `SkillConfig.gd` 静态管理。
 
 ### data/statuses.json
-由 `Database.get_statuses()` 加载。状态效果系统尚未实现，此文件预留。
+状态效果数据（预留）。当前游戏运行时状态数据由 `StatusConfig.gd` 静态管理。
 
 ### data/towns.json
-由 `Database.get_towns()` 加载。城镇系统尚未实现，此文件预留。
+城镇数据（预留，城镇系统尚未接入）。
+
+> ⚠️ `data/*.json` 目前**没有任何运行时读取方**：游戏数据全部由 `scripts/data/*Config.gd` 静态管理。
+> 它们与早期的 `Database.gd` / `CharacterData.gd` / `SkillData.gd` / `StatusData.gd` 同属“数据驱动”预留方案
+> （那几个脚本已于 2026-09 清理删除），保留 JSON 仅供未来扩展参考。
 
 ---
 

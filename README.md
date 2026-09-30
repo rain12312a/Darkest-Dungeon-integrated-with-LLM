@@ -4,6 +4,17 @@
 
 > **游戏流程**：`Start`（闪屏 → 主菜单）→ `Map`（随机地牢，逐房探索）→ `Battle`（回合制战斗）→ 胜利返回 `Map` / 击败首领通关返回 `Start`
 
+## 下载 Download
+
+**只想玩**（Windows x64，免安装）：到 [Releases](https://github.com/rain12312a/Darkest-Dungeon-integrated-with-LLM/releases) 下载 zip → 解压 → 双击 `darkdungeon.exe`。
+**0 配置**：在线 AI 喊话开箱即用；网络不通时自动改用内置离线引擎（判定逻辑一致，一样能完整游玩）。
+
+| 版本 | 大小 | 直链 |
+| --- | --- | --- |
+| `v1.0-demo` | 121.5 MB（exe + pck + 玩家必读） | [darkdungeon-win64-v1.0.zip](https://github.com/rain12312a/Darkest-Dungeon-integrated-with-LLM/releases/download/v1.0-demo/darkdungeon-win64-v1.0.zip) |
+
+**想改代码 / 自己构建**：见下方「快速开始」。
+
 ## 亮点 Features
 
 - 🧠 **LLM 英雄激励喊话**：向当前行动的英雄喊话，模型结合战况（血量 / 压力）与**你原话的语气**判定四种结果 —— ① 减压 ② 攻击增益 ③ 加压 ④ 精神崩溃、倒戈攻击队友。**发布版内置直连 Key，玩家双击即用（0 点击）**；未配置 / 网络不可达时自动降级为**离线 Mock**（同一套权重逻辑，离线也能完整游玩），也可在开始界面「LLM 设置」里换成自己的 Key
@@ -84,6 +95,26 @@ const MODEL := "deepseek-chat"
 > - ⚠️ 千万不要把 `api_config.gd` 手动 `git add`（它默认被忽略；`tools/embed_key.ps1` 会帮你确认这一点）。
 > - 想改用「真 Key 不落玩家机器」的自建代理方案，见 [worker/README.md](worker/README.md)。
 
+## 发布 Release
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\embed_key.ps1        # ① 明文 Key → 混淆串（仅在换 Key 时需要）
+powershell -ExecutionPolicy Bypass -File tools\export_release.ps1   # ② 导出 + 自动校验
+# ③ 打包与上传：dist\release.ps1（建/复用 Release）+ dist\upload_asset.ps1（curl 上传 zip）
+```
+
+`tools/export_release.ps1` 会自动校验四件事：
+
+| 校验项 | 说明 |
+| --- | --- |
+| 发布模式 | 自动判定「内置直连 Key / 自建代理 / 离线 Mock」并给出对应提醒 |
+| 明文残留 | `api_config.gd` 里若还有 `sk-` 明文直接报错（提示先跑 `embed_key.ps1`） |
+| 包内清单 | `pck` 文件表里不得出现 `tools/`、`worker/`，且内置 Key 必须真的随包 |
+| 日志读取 | Godot 是 GUI 子系统程序：变量捕获为空、管道又会被控制台编码（GBK）吞字符 → 脚本改用 `cmd` 字节级重定向 + UTF-8 读日志 |
+
+> ⚠️ 测导出包请**复制到工程目录之外**再运行：模板 exe 的 `res://` 在包里找不到文件时会回落到 exe 同目录的真实文件系统，
+> 放在工程目录里会读到本地的 `api_config.gd`，容易误判成「包里泄露了真 Key」。
+
 ## 关于 `.import` 与首次导入
 
 `.godot/`、`*.import`、`*.uid`、`export_presets.cfg`、`*.bank`、`*.py` 均在 `.gitignore` 内（项目约定，不入库）。克隆后资源需要重新导入：
@@ -128,7 +159,12 @@ darkdungeon/
 │
 ├── audio/                    # bgm/ + sfx/（提取后的 ogg）+ 原版 load_order json
 ├── overlays/  panels/  crypts/  fe_flow/  assets/   # 图标 / 面板 / 场景图 / 前端素材
-├── tools/                    # 无头验证探针（_probe_*.gd）与截图脚本（_shot_*.gd）
+├── tools/                    # 验证探针（_probe_*.gd）与截图脚本（_shot_*.gd）
+│   ├── embed_key.ps1         # 明文 Key → 混淆串（API_KEY_OBF）
+│   └── export_release.ps1    # 导出 + 发布包自动校验
+│
+├── worker/                   # 可选的 Cloudflare Worker 代理方案（真 Key 不落玩家机器）
+├── dist/                     # 本地发布产物 / 打包上传脚本（.gitignore，不入库）
 │
 └── *.md                      # 文档（见上）
 ```

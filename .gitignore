@@ -26,6 +26,13 @@ Thumbs.db
 # Godot exports (large binaries)
 text.exe
 text.pck
+darkdungeon.exe
+darkdungeon.console.exe
+darkdungeon.pck
+
+# 验证探针产生的临时截图 / 日志
+shot_*.png
+*_log.txt
 
 # API keys (sensitive)
 scripts/battle/api_config.gd

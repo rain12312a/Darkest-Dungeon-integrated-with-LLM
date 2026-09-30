@@ -27,6 +27,13 @@
 2. 首次运行前先导入资源（仓库忽略了 `*.import`，见下文「关于 `.import`」）
 3. 按 `F5` 运行，主场景 `scenes/main/Main.tscn`
 
+### 全屏 / 分辨率适配
+
+- 游戏中按 **`F11`** 或 **`Alt+Enter`** 切换全屏（全屏下按 `Esc` 退回窗口）
+- 采用 `canvas_items` + `keep` **等比缩放**：逻辑分辨率固定 1280×720，全屏时整幅放大并居中，非 16:9 屏幕（16:10 / 21:9）补黑边；因此战场底图、地图视口、开始界面等全部既有布局无需改动
+- 想让程序启动即全屏：把 `project.godot` 中 `[display] window/size/mode` 改为 `3`（全屏）或 `4`（独占全屏）
+- 已验证尺寸：1280×720 / 1600×900 / 1920×1080 / 1280×800(16:10) / 2560×1440 全屏，逻辑可见区恒为 1280×720（`tools/_probe_fullscreen.gd`，19 条断言全通过）
+
 ### 战斗内操作
 
 | 操作 | 说明 |
@@ -152,6 +159,12 @@ godot --headless --path . --script tools/_probe_stress.gd     # 打印 PASS/FAIL
 godot --headless --path . --script tools/_probe_skel_integrity.gd  # 全量 .skel 体检
 ```
 
+`tools/_probe_fullscreen.gd` 需要真实窗口（**不能**加 `--headless`），会校验窗口缩放、全屏切换与逻辑坐标，并输出 `shot_fullscreen_*.png` 供人工核对：
+
+```bash
+godot --path . --script res://tools/_probe_fullscreen.gd
+```
+
 ## Technology
 
 | Component | Details |
@@ -159,6 +172,7 @@ godot --headless --path . --script tools/_probe_skel_integrity.gd  # 全量 .ske
 | **Engine** | Godot 4.6 |
 | **Language** | GDScript |
 | **Rendering** | Vulkan Forward+ |
+| **Display** | 逻辑分辨率 1280×720，`canvas_items` + `keep` 等比缩放，`F11` / `Alt+Enter` 全屏切换 |
 | **Animation** | 自研 Spine 2.1.27 运行时（无需官方插件） |
 | **UI System** | 运行时由 GDScript 动态构建（无需手工搭场景） |
 | **LLM** | DeepSeek Chat API，可离线 Mock 降级 |

@@ -29,6 +29,7 @@ text.pck
 darkdungeon.exe
 darkdungeon.console.exe
 darkdungeon.pck
+dist/
 
 # 验证探针产生的临时截图 / 日志
 shot_*.png
@@ -36,3 +37,6 @@ shot_*.png
 
 # API keys (sensitive)
 scripts/battle/api_config.gd
+
+# 外置 LLM 配置（放在此处的本地覆盖，玩家在 exe 同目录自己放）
+api_config.json

@@ -17,19 +17,267 @@ const OUTCOME_TAGS := {
 	"BETRAY": Outcome.BETRAY,
 }
 
-# API 配置 —— 从外部文件加载（api_config.gd 已加入 .gitignore，不会上传到 GitHub）
-# 若文件不存在，api_key 默认为空字符串，自动降级为离线 Mock 模式
+# ============================================================
+# API 配置加载
+# 优先级（低 → 高），全部为空则自动降级为离线 Mock：
+#   ① res://scripts/battle/api_config.gd —— **内置直连 Key**（该文件被 .gitignore 忽略、不进 git 仓库；
+#      导出预设故意**不**排除它 → Key 随包发布。强烈建议用 tools\embed_key.ps1 写成 API_KEY_OBF 混淆形式，
+#      这样 exe/pck 里搜不到 "sk-" 明文，能挡掉绝大多数自动化爬虫）
+#   ② res://scripts/battle/api_public.gd —— 自建代理（填了地址就**优先于**①；真 Key 只存 Worker 里，最安全）
+#   ③ exe 同目录 api_config.json（编辑器内读工程根目录）—— 便携覆盖，免重新打包
+#   ④ user://llm_config.json —— 开始界面「LLM 设置」面板写入（玩家自己填的 Key，最高）
+# ⚠️ 内置 Key = 任何拿到 exe 的人理论上都能还原出来。务必用「独立 Key + 服务端消费上限」，
+#    一旦发现被盗用，去控制台吊销该 Key 即可（旧 exe 会自动降级为离线 Mock，不会坏掉）。
+# ============================================================
+const DEV_CONFIG_PATH := "res://scripts/battle/api_config.gd"
+const PUBLIC_CONFIG_PATH := "res://scripts/battle/api_public.gd"
+const EXTERNAL_CONFIG_NAME := "api_config.json"
+const USER_CONFIG_PATH := "user://llm_config.json"
+const DEFAULT_API_URL := "https://api.deepseek.com/v1/chat/completions"
+const DEFAULT_MODEL := "deepseek-chat"
+
 var api_key: String = ""
-var api_url: String = "https://api.deepseek.com/v1/chat/completions"
-var model: String = "deepseek-chat"
+var api_url: String = DEFAULT_API_URL
+var model: String = DEFAULT_MODEL
+# 当前生效的配置来源（仅用于 UI 展示：开始界面的 LLM 设置面板）
+var config_source: String = "离线 Mock 引擎"
 
 func _init() -> void:
-	# 尝试加载外部 API 配置文件（gitignored）
-	var cfg := load("res://scripts/battle/api_config.gd")
-	if cfg:
-		api_key = cfg.get("API_KEY") if cfg.get("API_KEY") else ""
-		api_url = cfg.get("API_URL") if cfg.get("API_URL") else api_url
-		model = cfg.get("MODEL") if cfg.get("MODEL") else model
+	reload()
+
+# 清空后按优先级重新加载（设置面板保存 / 清除后调用）
+func reload() -> void:
+	api_key = ""
+	api_url = DEFAULT_API_URL
+	model = DEFAULT_MODEL
+	config_source = "离线 Mock 引擎"
+	# 从低到高依次应用，后面的来源会覆盖前面的同名非空字段
+	_apply_gd_config(DEV_CONFIG_PATH, "内置直连 Key（api_config.gd）")
+	_apply_gd_config(PUBLIC_CONFIG_PATH, "内置代理（api_public.gd）")
+	_apply_json_file(_external_config_path(), EXTERNAL_CONFIG_NAME)
+	_apply_json_file(USER_CONFIG_PATH, "游戏内设置")
+	if api_key.strip_edges().is_empty():
+		config_source = "离线 Mock 引擎"
+	# 玩家报「LLM 不生效」时，看这一行就知道当前吃的是哪一层配置
+	print("[LLM] 配置来源=", config_source, " 在线=", has_online_config(), " 模型=", model)
+
+# 读取 .gd 常量配置（文件不存在时静默跳过）
+func _apply_gd_config(path: String, source: String = "") -> void:
+	if not ResourceLoader.exists(path):
+		return
+	var cfg: Resource = load(path)
+	if cfg == null:
+		return
+	var key := _variant_str(cfg.get("API_KEY"))
+	if key.strip_edges().is_empty():
+		key = decode_obfuscated_key(_variant_str(cfg.get("API_KEY_OBF")))
+	_assign_config(key, _variant_str(cfg.get("API_URL")), _variant_str(cfg.get("MODEL")), source)
+
+# 外置 JSON 配置路径：导出后取 exe 同目录，编辑器内取工程根目录
+func _external_config_path() -> String:
+	if OS.has_feature("template"):
+		return OS.get_executable_path().get_base_dir().path_join(EXTERNAL_CONFIG_NAME)
+	return "res://" + EXTERNAL_CONFIG_NAME
+
+func _apply_json_file(path: String, source: String = "") -> void:
+	if not FileAccess.file_exists(path):
+		return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		push_warning("[LLM] " + path + " 不是合法 JSON，已忽略")
+		return
+	var dict: Dictionary = parsed
+	var key := _dict_str(dict, "API_KEY")
+	if key.strip_edges().is_empty():
+		key = decode_obfuscated_key(_dict_str(dict, "API_KEY_OBF"))
+	_assign_config(key, _dict_str(dict, "API_URL"), _dict_str(dict, "MODEL"), source)
+	print("[LLM] 已加载", source, "：", path)
+
+func _assign_config(key: String, url: String, model_name: String, source: String = "") -> void:
+	# 只有真正带来 Key 的那一层才算「当前生效来源」（否则空的 api_public.gd 仅因为写了 MODEL
+	# 就会把来源标签抢走，UI 上会误导）
+	if not key.strip_edges().is_empty():
+		api_key = key
+		if not source.is_empty():
+			config_source = source
+	if not url.strip_edges().is_empty():
+		api_url = url
+	if not model_name.strip_edges().is_empty():
+		model = model_name
+
+# ============================================================
+# Key 混淆（**不是加密**）：只为了让 exe / pck / 仓库里搜不到 "sk-" 明文，
+# 挡掉 GitHub 密钥扫描、自动化爬虫、`strings | grep sk-` 这类批量工具。
+# 算法：UTF-8 字节 XOR 循环盐 → Base64；由 tools\embed_key.ps1 生成，两边必须一致。
+# ============================================================
+const KEY_SALT := "darkdungeon-2026"
+
+func encode_key(plain: String) -> String:
+	var salt := KEY_SALT.to_utf8_buffer()
+	var raw := plain.to_utf8_buffer()
+	var out := PackedByteArray()
+	out.resize(raw.size())
+	for i in raw.size():
+		out[i] = raw[i] ^ salt[i % salt.size()]
+	return Marshalls.raw_to_base64(out)
+
+func decode_obfuscated_key(blob: String) -> String:
+	var s := blob.strip_edges()
+	if s.is_empty():
+		return ""
+	var raw := Marshalls.base64_to_raw(s)
+	if raw.is_empty():
+		push_warning("[LLM] API_KEY_OBF 不是合法 Base64，已忽略")
+		return ""
+	var salt := KEY_SALT.to_utf8_buffer()
+	var out := PackedByteArray()
+	out.resize(raw.size())
+	for i in raw.size():
+		out[i] = raw[i] ^ salt[i % salt.size()]
+	return out.get_string_from_utf8()
+
+# ============================================================
+# 在线请求熔断：连续失败（被墙 / Key 被吊销 / 超额 / 超时）后，
+# 本次运行内直接走离线 Mock，不再每次白白等 3.5 秒超时。
+# static → 跨战斗生效；设置面板「保存并测试」成功会自动恢复。
+# ============================================================
+const FAIL_STREAK_LIMIT := 2
+static var fail_streak: int = 0
+static var online_disabled: bool = false
+
+func _note_online_failure(why: String) -> void:
+	fail_streak += 1
+	if fail_streak >= FAIL_STREAK_LIMIT and not online_disabled:
+		online_disabled = true
+		config_source = "离线 Mock 引擎（在线不可达）"
+		print("[LLM] 连续 ", fail_streak, " 次在线请求失败（", why, "）→ 本次运行内改用离线 Mock")
+
+func _note_online_success() -> void:
+	if online_disabled:
+		print("[LLM] 在线请求恢复正常")
+	fail_streak = 0
+	online_disabled = false
+
+func reset_online_failure_state() -> void:
+	fail_streak = 0
+	online_disabled = false
+
+# ============================================================
+# 开始界面「LLM 设置」面板用的接口（玩家填 Key → 点击即用，无需重新下载）
+# ============================================================
+
+# 是否已配置在线模型（false = 走离线 Mock 引擎）
+func has_online_config() -> bool:
+	return not api_key.strip_edges().is_empty()
+
+# 写入 user://llm_config.json 并立即对当前实例生效；返回是否写入成功
+func save_user_config(key: String, url: String, model_name: String) -> bool:
+	var k := key.strip_edges()
+	var u := url.strip_edges()
+	var m := model_name.strip_edges()
+	var f := FileAccess.open(USER_CONFIG_PATH, FileAccess.WRITE)
+	if f == null:
+		push_warning("[LLM] 无法写入 " + USER_CONFIG_PATH)
+		return false
+	f.store_string(JSON.stringify({"API_KEY": k, "API_URL": u, "MODEL": m}, "\t"))
+	f.close()
+	api_key = k
+	api_url = u if not u.is_empty() else DEFAULT_API_URL
+	model = m if not m.is_empty() else DEFAULT_MODEL
+	config_source = "游戏内设置" if has_online_config() else "离线 Mock 引擎"
+	return true
+
+# 删除游戏内设置的文件，回落到内置 / 外置配置（没有则离线 Mock）
+func clear_user_config() -> void:
+	if FileAccess.file_exists(USER_CONFIG_PATH):
+		DirAccess.remove_absolute(USER_CONFIG_PATH)
+	reload()
+
+# 连通性自检：填完 Key 先ping 一下，避免进战斗才发现连不上
+# 返回 {"ok": bool, "message": String}（message 直接显示在设置面板里）
+func test_connection(parent_node: Node) -> Dictionary:
+	if not has_online_config():
+		return {"ok": false, "message": "未填写 API Key（当前为离线 Mock 模式）"}
+	if parent_node == null or parent_node.get_tree() == null:
+		return {"ok": false, "message": "内部错误：缺少场景树"}
+
+	var http := HTTPRequest.new()
+	parent_node.add_child(http)
+	http.set_use_threads(true)
+	var headers: PackedStringArray = [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + api_key,
+	]
+	var payload := {
+		"model": model,
+		"messages": [ {"role": "user", "content": "ping"}],
+		"max_tokens": 4,
+	}
+	var err: int = http.request(api_url, headers, HTTPClient.METHOD_POST, JSON.stringify(payload))
+	if err != OK:
+		http.queue_free()
+		_note_online_failure("发送失败 %d" % err)
+		return {"ok": false, "message": "请求发送失败（错误码 %d），请检查 API 地址格式" % err}
+
+	var state := {"done": false, "data": []}
+	http.request_completed.connect(func(res: int, code: int, _h: PackedStringArray, body: PackedByteArray):
+		if not state["done"]:
+			state["done"] = true
+			state["data"] = [res, code, body])
+
+	var timer := parent_node.get_tree().create_timer(8.0)
+	while not state["done"]:
+		if not is_instance_valid(http):
+			break
+		await parent_node.get_tree().process_frame
+		if timer.time_left <= 0.0:
+			state["done"] = true
+			if is_instance_valid(http):
+				http.cancel_request()
+				http.queue_free()
+			_note_online_failure("8s 超时")
+			return {"ok": false, "message": "连接超时（8 秒）：请检查网络，或换一个 API 地址"}
+
+	if is_instance_valid(http):
+		http.queue_free()
+
+	var data: Array = state["data"]
+	if data.is_empty():
+		_note_online_failure("无响应")
+		return {"ok": false, "message": "未收到响应"}
+	var result: int = data[0]
+	var code: int = data[1]
+	if result != HTTPRequest.RESULT_SUCCESS:
+		_note_online_failure("result=%d" % result)
+		return {"ok": false, "message": "网络错误（result=%d）：地址不可达，或被墙 / 代理未启动" % result}
+	var described: Dictionary = describe_http_result(code)
+	if bool(described.get("ok", false)):
+		reset_online_failure_state()
+	else:
+		_note_online_failure("HTTP %d" % code)
+	return described
+
+# HTTP 状态码 → 面板提示（纯函数，便于离线探针覆盖）
+func describe_http_result(code: int) -> Dictionary:
+	match code:
+		200:
+			return {"ok": true, "message": "连接成功！喊话判定由在线模型 %s 完成" % model}
+		401, 403:
+			return {"ok": false, "message": "鉴权失败（HTTP %d）：API Key / 代理令牌不正确" % code}
+		404:
+			return {"ok": false, "message": "地址不存在（HTTP 404）：API 地址可能写错了"}
+		429:
+			return {"ok": false, "message": "被限流（HTTP 429）：请求过于频繁或额度用尽"}
+	var suffix := "服务端错误" if code >= 500 else "请检查地址 / Key / 模型名"
+	return {"ok": false, "message": "接口返回 HTTP %d：%s" % [code, suffix]}
+
+func _variant_str(v: Variant) -> String:
+	if v is String:
+		return v
+	return ""
+
+func _dict_str(dict: Dictionary, key: String) -> String:
+	return _variant_str(dict.get(key, ""))
 
 # ============================================================
 # 备用的离线/优雅降级高保真本地语料库（正面 / 中性 / 负面）
@@ -169,8 +417,8 @@ func input_tone_label(score: int) -> String:
 func get_hero_reply(hero_name: String, personality: String, player_input: String, hero_hp: int, hero_max_hp: int, hero_stress: int, monsters_count: int, parent_node: Node) -> Dictionary:
 	var is_crusader := hero_name.to_lower().contains("crusader")
 	
-	# 如果没有配置 API Key，直接使用极速离线 Mock
-	if api_key.strip_edges().is_empty():
+	# 没有 Key，或已被熔断（连续失败 2 次）→ 直接走极速离线 Mock，不再等 3.5 秒超时
+	if api_key.strip_edges().is_empty() or online_disabled:
 		return _generate_mock_result(is_crusader, hero_hp, hero_stress, player_input)
 
 	# 本地语气预判：把“玩家说了什么”的权重前置给模型
@@ -229,6 +477,7 @@ func get_hero_reply(hero_name: String, personality: String, player_input: String
 	var error = http_request.request(api_url, headers, HTTPClient.METHOD_POST, json_payload)
 	if error != OK:
 		print("[LLM] Send HTTP Request failed with error code: ", error)
+		_note_online_failure("发送失败 %d" % error)
 		http_request.queue_free()
 		return _generate_mock_result(is_crusader, hero_hp, hero_stress, player_input)
 		
@@ -250,6 +499,7 @@ func get_hero_reply(hero_name: String, personality: String, player_input: String
 		await parent_node.get_tree().process_frame
 		if timeout_timer.time_left <= 0.0:
 			print("[LLM] Request timeout (3.5s). Falling back to mock engine.")
+			_note_online_failure("3.5s 超时")
 			req_state["is_completed"] = true
 			if is_instance_valid(http_request):
 				http_request.cancel_request()
@@ -261,6 +511,7 @@ func get_hero_reply(hero_name: String, personality: String, player_input: String
 		
 	var r_data: Array = req_state["response_data"]
 	if r_data.is_empty():
+		_note_online_failure("无响应")
 		return _generate_mock_result(is_crusader, hero_hp, hero_stress, player_input)
 		
 	var result = r_data[0]
@@ -269,6 +520,7 @@ func get_hero_reply(hero_name: String, personality: String, player_input: String
 	
 	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200:
 		print("[LLM] Request failed, result: ", result, " code: ", response_code)
+		_note_online_failure("result=%d code=%d" % [result, response_code])
 		return _generate_mock_result(is_crusader, hero_hp, hero_stress, player_input)
 		
 	# 解析 Response JSON
@@ -276,14 +528,17 @@ func get_hero_reply(hero_name: String, personality: String, player_input: String
 	var parse_err = json.parse(body.get_string_from_utf8())
 	if parse_err != OK:
 		print("[LLM] Parse JSON failed")
+		_note_online_failure("响应不是合法 JSON")
 		return _generate_mock_result(is_crusader, hero_hp, hero_stress, player_input)
 		
 	var parsed_res = json.get_data()
 	if not parsed_res is Dictionary or not parsed_res.has("choices") or parsed_res["choices"].is_empty():
 		print("[LLM] Invalid OpenAI API standard scheme: ", parsed_res)
+		_note_online_failure("响应缺少 choices")
 		return _generate_mock_result(is_crusader, hero_hp, hero_stress, player_input)
 		
 	var reply_content = parsed_res["choices"][0]["message"]["content"]
+	_note_online_success()
 	return _parse_outcome_reply(reply_content, player_input)
 
 # ============================================================

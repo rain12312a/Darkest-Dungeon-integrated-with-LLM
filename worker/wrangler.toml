@@ -1,0 +1,11 @@
+# 用 wrangler 部署时才需要本文件；用 Cloudflare 网页版控制台部署可忽略。
+# 密钥不要写在这里，用 `wrangler secret put DEEPSEEK_API_KEY` 设置。
+
+name = "darkdungeon-llm"
+main = "llm_proxy.js"
+compatibility_date = "2026-01-01"
+
+# 可选：自定义域名（国内网络访问 *.workers.dev 常常不通，建议绑自有域名）
+# routes = [
+#   { pattern = "llm.example.com", custom_domain = true }
+# ]

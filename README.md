@@ -6,7 +6,7 @@
 
 ## 亮点 Features
 
-- 🧠 **LLM 英雄激励喊话**：向当前行动的英雄喊话，模型结合战况（血量 / 压力）与**你原话的语气**判定四种结果 —— ① 减压 ② 攻击增益 ③ 加压 ④ 精神崩溃、倒戈攻击队友。未配置 API Key 时自动降级为**离线 Mock**（同一套权重逻辑，离线也能完整游玩）
+- 🧠 **LLM 英雄激励喊话**：向当前行动的英雄喊话，模型结合战况（血量 / 压力）与**你原话的语气**判定四种结果 —— ① 减压 ② 攻击增益 ③ 加压 ④ 精神崩溃、倒戈攻击队友。**发布版内置直连 Key，玩家双击即用（0 点击）**；未配置 / 网络不可达时自动降级为**离线 Mock**（同一套权重逻辑，离线也能完整游玩），也可在开始界面「LLM 设置」里换成自己的 Key
 - 🦴 **自研 Spine 运行时**（纯 GDScript，**不需要**官方 Spine 插件）：解析 `.skel` / `.atlas`，支持 Region / Mesh / SkinnedMesh 附件，逐顶点按骨骼权重蒙皮（Polygon2D）
 - ⚔️ **回合制战斗**：速度浮动 + 行动队列驱动；4 名英雄（十字军 / 强盗 / 神秘学者 / 训犬师）对抗骷髅军团与「门前恶狼」首领战
 - 🩸 **暗黑地牢核心机制**：死门（Death's Door）、压力 / 折磨 / 美德、DoT（流血 / 腐蚀）、晕眩、标记、守护、消耗品、战利品结算
@@ -46,15 +46,43 @@
 
 ### 可选：启用在线 LLM
 
-`scripts/battle/api_config.gd` 已被 `.gitignore` 排除，克隆后自行创建：
+**玩家侧（双击 exe 就能用）**：开始界面右上角有 **「LLM 设置」** 按钮（显示当前是在线 / 离线）。**发布版只要把代理地址填进 `api_public.gd`（见 [worker/README.md](worker/README.md) 的三步走），玩家连这个按钮都不用点** —— 开局直接就是在线 LLM。
+
+只有在**完全没有可用在线配置**时，首次点 `START` 才会自动弹一次引导面板，二选一：
+
+- **离线开始** — 不填任何东西，用内置离线 Mock 引擎，四种结果逻辑完整
+- **保存并开始** — 填入 API Key（或自建代理地址 + 代理令牌），面板会先**测试连通性**再开局
+
+设置写入本机 `%APPDATA%\Godot\app_userdata\darkdungeon\llm_config.json`，随时可改，不影响存档。
+
+**配置优先级**（低 → 高，后写入的非空字段覆盖前者）：
+
+| 优先级 | 来源 | 用途 |
+| --- | --- | --- |
+| ① | `scripts/battle/api_config.gd` | **内置直连 Key**（`.gitignore` 忽略，**随包发布**；建议用 `tools/embed_key.ps1` 混淆存放） |
+| ② | `scripts/battle/api_public.gd` | 自建代理地址 + 公开令牌（可入库；**填了就优先于 ①**，真 Key 只存在 Worker 里，最安全） |
+| ③ | exe 同目录 `api_config.json` | 便携覆盖，免重新打包 |
+| ④ | `user://llm_config.json` | 开始界面「LLM 设置」面板写入 |
+
+**开发者侧**：`scripts/battle/api_config.gd` 已被 `.gitignore` 忽略，克隆后自行创建：
 
 ```gdscript
-const API_KEY := ""  # 留空 = 使用离线 Mock 引擎
+const API_KEY := ""                       # 明文（本地调试用）；留空且 OBF 也为空 = 离线 Mock
+const API_KEY_OBF := ""                   # 混淆形式（推荐），由 tools\embed_key.ps1 生成
 const API_URL := "https://api.deepseek.com/v1/chat/completions"
 const MODEL := "deepseek-chat"
 ```
 
-> ⚠️ 请勿把真实 API Key 提交进仓库（该文件默认忽略，历史中亦无泄漏记录）。
+> 🚀 **发布版是「内置直连 Key」模式（0 点击）**：
+> ```powershell
+> powershell -ExecutionPolicy Bypass -File tools\embed_key.ps1      # 明文 Key → 混淆形式
+> powershell -ExecutionPolicy Bypass -File tools\export_release.ps1 # 导出 + 自动校验
+> ```
+> - **好处**：玩家双击 exe → 点 START 直接开局，不用配任何东西；也不用买域名/搭代理。
+> - **代价**：Key 随包发布，拿到 exe 且愿意动手的人理论上能还原出来（脚本已把它混淆成 Base64，包里搜不到 `sk-` 明文，挡掉 GitHub 密钥扫描 / 自动化爬虫 / `strings` 批量扫描）。
+> - **必做**：① 在 DeepSeek 控制台给这个 Key **设消费上限**；② 用**独立于日常使用的 Key**，被盗用就去控制台**吊销**它 —— 旧 exe 会自动降级为离线 Mock，不会坏掉。
+> - ⚠️ 千万不要把 `api_config.gd` 手动 `git add`（它默认被忽略；`tools/embed_key.ps1` 会帮你确认这一点）。
+> - 想改用「真 Key 不落玩家机器」的自建代理方案，见 [worker/README.md](worker/README.md)。
 
 ## 关于 `.import` 与首次导入
 

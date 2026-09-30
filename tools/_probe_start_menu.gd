@@ -4,11 +4,14 @@ extends SceneTree
 # 用途：验证新的「闪屏 + 暗黑地牢原版风格开始菜单」与固定编队开局
 #   ① 闪屏层（demo_splash）与菜单层并存，菜单默认被闪屏盖住
 #   ② 跳过闪屏 → 淡出并释放；同一进程内二次进入不再闪屏
-#   ③ 主菜单构件：红色辉光底板 / 宅邸剪影 / DEMO 标志 / 尺寸三选一 / START 按钮
-#   ④ START → 固定编队（十字军·强盗·神秘学者·训犬师）→ 重置补给与关卡 → 进地图
+#   ③ 主菜单构件：红色辉光底板 / 宅邸剪影 / DEMO 标志 / 尺寸三选一 / START 按钮 / LLM 设置入口
+#   ④ 首次 START → 先弹 LLM 设置面板（点「离线开始」）→ 固定编队（十字军·强盗·神秘学者·训犬师）→ 重置补给与关卡 → 进地图
 # 运行：godot --headless --path <项目> --script res://tools/_probe_start_menu.gd
 
 const EXPECTED_TEAM: Array[String] = ["crusader", "highwayman", "occultist", "houndmaster"]
+const USER_CFG := "user://llm_config.json"
+const USER_BACKUP := "user://llm_config.probe_backup"
+const SETUP_FLAG := "user://llm_setup_done"
 
 var _start: Node = null
 var _second: Node = null
@@ -150,12 +153,42 @@ func _test_menu_widgets() -> void:
 # ------------------------------------------------------------ ④ 固定编队开局
 
 func _test_fixed_team_start() -> void:
-	print("[START] --- ④ START 开新局 ---")
+	print("[START] --- ④ START 开新局（首次引导门禁 / 0 点击）---")
+	# 隔离本机 LLM 配置：面板的「离线开始」会清空 user://llm_config.json，探针不许动真配置
+	var had_cfg := FileAccess.file_exists(USER_CFG)
+	if had_cfg:
+		DirAccess.copy_absolute(USER_CFG, USER_BACKUP)
+		DirAccess.remove_absolute(USER_CFG)
+	if FileAccess.file_exists(SETUP_FLAG):
+		DirAccess.remove_absolute(SETUP_FLAG)
+
+	var client := LLMClient.new()
+	var online := client.has_online_config()
+	client.free()
+	_expect(_start.call("_needs_llm_setup") == not online, "引导判定 = 本机无任何可用在线配置（实际在线=%s）" % str(online))
+
+	# 手动入口必须随时可用（非首次形态），且 Key 是密文
+	_start.call("_open_llm_panel", false)
+	_expect(is_instance_valid(_start.get("_llm_panel")), "「LLM 设置」面板可手动打开")
+	var key_edit: LineEdit = _start.get("_llm_key_edit")
+	_expect(key_edit != null and key_edit.secret, "Key 输入框为密文（secret=true）")
+	_start.call("_on_llm_cancel_pressed")
+	_expect(_start.get("_llm_panel") == null, "点「关闭」后引导面板已释放")
+
 	_start.call("_on_start_pressed")
+	if online:
+		_expect(_start.get("_llm_panel") == null, "已有可用的在线配置 → 首次 START 不弹引导，直接开局（0 点击）")
+	else:
+		_expect(is_instance_valid(_start.get("_llm_panel")), "无任何在线配置 → 首次 START 先弹引导面板")
+		_expect(HeroConfig.CURRENT_TEAM != EXPECTED_TEAM, "引导阶段尚未写入固定编队")
+		_expect(DungeonMap.current_room == "", "引导阶段尚未进入地图")
+		_start.call("_on_llm_offline_pressed")
+		_expect(_start.get("_llm_panel") == null, "点「离线开始」后面板已关闭")
+		_expect(FileAccess.file_exists(SETUP_FLAG), "已写入 user://llm_setup_done（下次不再引导）")
 
 	var team: Array = HeroConfig.CURRENT_TEAM
 	_expect(team == EXPECTED_TEAM, "编队固定为 十字军/强盗/神秘学者/训犬师（实际 %s）" % str(team))
-	_expect(HeroConfig.PARTY_STATES.is_empty(), "队伍跨战斗状态已重置")
+	_expect(HeroConfig.PARTY_STATES.is_empty(), "队伍跳战斗状态已重置")
 	_expect(ConsumableConfig.get_count("food") == 4 and ConsumableConfig.get_count("bandage") == 2 and ConsumableConfig.get_count("dogfood") == 2,
 		"初始补给重置为 4 食物 / 2 绷带 / 2 狗粮")
 	_expect(str(_start.get("_size_key")) == "large", "使用玩家选中的尺寸开局")
@@ -164,3 +197,10 @@ func _test_fixed_team_start() -> void:
 	_expect(DungeonMap.current_room != "", "已进入起始房间")
 	var button: Button = _start.get("_start_button")
 	_expect(button != null and button.disabled, "开局后 START 按钮禁用，防重复点击")
+
+	# 还原本机 LLM 配置与首次引导标记，不影响开发者自己的环境
+	if FileAccess.file_exists(SETUP_FLAG):
+		DirAccess.remove_absolute(SETUP_FLAG)
+	if had_cfg:
+		DirAccess.copy_absolute(USER_BACKUP, USER_CFG)
+		DirAccess.remove_absolute(USER_BACKUP)

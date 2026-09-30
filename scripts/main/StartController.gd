@@ -66,6 +66,19 @@ var _size_buttons: Array[Button] = []
 var _size_hint_label: Label = null
 var _size_key := "medium"
 
+# --- LLM 设置（首次启动引导 + 随时可改）---
+const LLM_SETUP_FLAG := "user://llm_setup_done"
+const LLM_DEFAULT_URL := "https://api.deepseek.com/v1/chat/completions"
+const LLM_DEFAULT_MODEL := "deepseek-chat"
+const LLM_PANEL_SIZE := Vector2(900.0, 580.0)
+var _llm_button: Button = null
+var _llm_panel: Control = null
+var _llm_url_edit: LineEdit = null
+var _llm_key_edit: LineEdit = null
+var _llm_model_edit: LineEdit = null
+var _llm_status: Label = null
+var _pending_start := false
+
 func _ready() -> void:
 	_build_menu()
 	var vp := get_viewport()
@@ -134,6 +147,7 @@ func _build_menu() -> void:
 	_add_logo()
 	_add_size_row()
 	_add_start_button()
+	_add_llm_button()
 	_add_build_label()
 
 # 底板：title_bg.png 是 1920×2160 的整段前端背景，取下半屏（黑天 + 红色辉光）
@@ -343,10 +357,19 @@ func _on_size_pressed(size_key: String) -> void:
 	_size_key = size_key
 	_refresh_size_row()
 
-# START：写入固定编队 → 重置关卡与补给 → 直接进入地图（不再经过编队选择）
+# START：本机完全没有可用在线配置时才引导一次；已配好内置代理则直接开局（0 点击）
 func _on_start_pressed() -> void:
 	if _start_button != null:
 		_start_button.disabled = true
+	if _needs_llm_setup():
+		_open_llm_panel(true)
+		return
+	_begin_run()
+
+# 写入固定编队 → 重置关卡与补给 → 直接进入地图（不再经过编队选择）
+func _begin_run() -> void:
+	if _start_button != null:
+		_start_button.disabled = true # 防子开局途中重复点击（取消引导时才会重新启用）
 	var team: Array[String] = []
 	for hero_id in FIXED_TEAM:
 		team.append(str(hero_id))
@@ -357,3 +380,240 @@ func _on_start_pressed() -> void:
 	DungeonMap.reset_run()
 	print("[Start] New run: team=", team, " map=", _size_key)
 	get_tree().change_scene_to_file("res://scenes/map/Map.tscn")
+
+# ------------------------------------------------------------ LLM 设置面板
+
+func _llm_setup_done() -> bool:
+	return FileAccess.file_exists(LLM_SETUP_FLAG)
+
+# 是否需要首次引导：已引导过（玩家点过离线开始）就不弹；已有可用在线配置也不弹
+# （发布版把代理地址填进 api_public.gd 后，玩家双击 exe → 点 START 即直接开局 = 0 点击）
+func _needs_llm_setup() -> bool:
+	if _llm_setup_done():
+		return false
+	return not _llm_online_available()
+
+func _llm_online_available() -> bool:
+	var client := LLMClient.new()
+	var online := client.has_online_config()
+	client.free()
+	return online
+
+func _mark_llm_setup_done() -> void:
+	var f := FileAccess.open(LLM_SETUP_FLAG, FileAccess.WRITE)
+	if f != null:
+		f.store_string("1")
+		f.close()
+
+# 右上角常驻入口：随时可改 Key / 切回离线
+func _add_llm_button() -> void:
+	_llm_button = Button.new()
+	_llm_button.name = "LlmSettingsButton"
+	_llm_button.focus_mode = Control.FOCUS_NONE
+	_llm_button.position = Vector2(DESIGN_SIZE.x - 208.0, 24.0)
+	_llm_button.size = Vector2(184.0, 40.0)
+	_style_banner_button(_llm_button, 17)
+	_llm_button.pressed.connect(_on_llm_button_pressed)
+	_design_root.add_child(_llm_button)
+	_refresh_llm_button()
+
+func _refresh_llm_button() -> void:
+	if not is_instance_valid(_llm_button):
+		return
+	var online := _llm_online_available()
+	if online and LLMClient.online_disabled:
+		_llm_button.text = "LLM 设置 · 在线不可达"
+		_llm_button.add_theme_color_override("font_color", Color(0.95, 0.78, 0.45, 1))
+		return
+	_llm_button.text = "LLM 设置 · 在线" if online else "LLM 设置 · 离线"
+	_llm_button.add_theme_color_override("font_color", Color(0.68, 0.92, 0.68, 1) if online else Color(0.66, 0.62, 0.54, 1))
+
+func _on_llm_button_pressed() -> void:
+	_open_llm_panel(false)
+
+func _open_llm_panel(first_run: bool) -> void:
+	if is_instance_valid(_llm_panel):
+		return
+	_pending_start = first_run
+
+	var client := LLMClient.new()
+	var cur_key := client.api_key
+	var cur_url := client.api_url
+	var cur_model := client.model
+	var cur_source := client.config_source
+	client.free()
+
+	var mask := ColorRect.new()
+	mask.name = "LlmMask"
+	mask.color = Color(0, 0, 0, 0.74)
+	mask.size = DESIGN_SIZE
+	mask.mouse_filter = Control.MOUSE_FILTER_STOP
+	_design_root.add_child(mask)
+	_llm_panel = mask
+
+	var frame := PanelContainer.new()
+	frame.name = "LlmFrame"
+	frame.position = (DESIGN_SIZE - LLM_PANEL_SIZE) * 0.5
+	frame.size = LLM_PANEL_SIZE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.07, 0.06, 0.98)
+	style.border_color = Color(0.55, 0.45, 0.24, 1.0)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(4)
+	style.set_content_margin_all(26.0)
+	frame.add_theme_stylebox_override("panel", style)
+	mask.add_child(frame)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	frame.add_child(box)
+
+	var title := Label.new()
+	title.text = "LLM 激励喊话 · 连接设置"
+	title.add_theme_font_size_override("font_size", 27)
+	title.add_theme_color_override("font_color", Color(0.93, 0.83, 0.55, 1))
+	box.add_child(title)
+
+	var desc := Label.new()
+	desc.text = ("① 不填任何内容：直接用内置离线 Mock 引擎（四种结果逻辑完整，单机也能玩）。\n"
+		+"② 填入自己的 API Key：喊话交由在线大模型判定。\n"
+		+"③ 使用自建代理：地址填代理地址、Key 填代理令牌（推荐，真 Key 不会下发到玩家机器）。\n"
+		+"设置只保存在本机，随时可改。当前生效：" + cur_source)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc.add_theme_font_size_override("font_size", 17)
+	desc.add_theme_color_override("font_color", Color(0.74, 0.7, 0.62, 1))
+	box.add_child(desc)
+
+	_llm_url_edit = _add_llm_row(box, "API 地址", cur_url, false)
+	_llm_key_edit = _add_llm_row(box, "API Key", cur_key, true)
+	_llm_model_edit = _add_llm_row(box, "模型", cur_model, false)
+
+	_llm_status = Label.new()
+	_llm_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_llm_status.custom_minimum_size = Vector2(0.0, 44.0)
+	_llm_status.add_theme_font_size_override("font_size", 17)
+	_llm_status.add_theme_color_override("font_color", Color(0.72, 0.68, 0.6, 1))
+	_llm_status.text = "填好后点「%s」，会先测试连通性再开局。" % ("保存并开始" if first_run else "保存并测试")
+	box.add_child(_llm_status)
+
+	var btn_row := HBoxContainer.new()
+	btn_row.alignment = BoxContainer.ALIGNMENT_END
+	btn_row.add_theme_constant_override("separation", 14)
+	box.add_child(btn_row)
+	if first_run:
+		_add_llm_action(btn_row, "保存并开始", _on_llm_save_pressed)
+		_add_llm_action(btn_row, "离线开始", _on_llm_offline_pressed)
+		_add_llm_action(btn_row, "返回", _on_llm_cancel_pressed)
+	else:
+		_add_llm_action(btn_row, "保存并测试", _on_llm_save_pressed)
+		_add_llm_action(btn_row, "清除（改用离线）", _on_llm_clear_pressed)
+		_add_llm_action(btn_row, "关闭", _on_llm_cancel_pressed)
+
+	if is_instance_valid(_llm_key_edit):
+		_llm_key_edit.grab_focus()
+
+func _add_llm_row(parent: VBoxContainer, label_text: String, value: String, secret: bool) -> LineEdit:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	parent.add_child(row)
+
+	var lbl := Label.new()
+	lbl.text = label_text
+	lbl.custom_minimum_size = Vector2(140.0, 0.0)
+	lbl.add_theme_font_size_override("font_size", 18)
+	lbl.add_theme_color_override("font_color", Color(0.8, 0.74, 0.6, 1))
+	row.add_child(lbl)
+
+	var edit := LineEdit.new()
+	edit.text = value
+	edit.secret = secret
+	if secret:
+		edit.placeholder_text = "留空 = 离线 Mock"
+	edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	edit.custom_minimum_size = Vector2(0.0, 40.0)
+	edit.add_theme_font_size_override("font_size", 18)
+	row.add_child(edit)
+	return edit
+
+func _add_llm_action(parent: HBoxContainer, text: String, handler: Callable) -> Button:
+	var btn := Button.new()
+	btn.text = text
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.custom_minimum_size = Vector2(190.0, 46.0)
+	_style_banner_button(btn, 18)
+	btn.pressed.connect(handler)
+	parent.add_child(btn)
+	return btn
+
+func _set_llm_status(text: String, ok: bool) -> void:
+	if not is_instance_valid(_llm_status):
+		return
+	_llm_status.text = text
+	_llm_status.add_theme_color_override("font_color", Color(0.62, 0.9, 0.62, 1) if ok else Color(0.93, 0.6, 0.5, 1))
+
+# 保存 → 自检 → 若来自 START 引导则直接开局
+func _on_llm_save_pressed() -> void:
+	if not is_instance_valid(_llm_key_edit):
+		return
+	var key := _llm_key_edit.text.strip_edges()
+	if key.is_empty():
+		_set_llm_status("请先填写 API Key；只想离线游玩请点「离线开始」。", false)
+		return
+	var url := _llm_url_edit.text.strip_edges()
+	var mdl := _llm_model_edit.text.strip_edges()
+	var client := LLMClient.new()
+	if not client.save_user_config(key, url, mdl):
+		client.free()
+		_set_llm_status("无法写入本机配置目录（user://）", false)
+		return
+	_mark_llm_setup_done()
+	_set_llm_status("已保存，正在测试连接…", true)
+	var r: Dictionary = await client.test_connection(self)
+	client.free()
+	var ok: bool = r.get("ok", false)
+	_set_llm_status(str(r.get("message", "")), ok)
+	_refresh_llm_button()
+	if ok and _pending_start:
+		_close_llm_panel()
+		_begin_run()
+
+# 不配 Key：清空游戏内设置并直接开局（离线 Mock）
+func _on_llm_offline_pressed() -> void:
+	var client := LLMClient.new()
+	client.clear_user_config()
+	client.free()
+	_mark_llm_setup_done()
+	_refresh_llm_button()
+	var start := _pending_start
+	_close_llm_panel()
+	if start:
+		_begin_run()
+
+func _on_llm_clear_pressed() -> void:
+	var client := LLMClient.new()
+	client.clear_user_config()
+	client.free()
+	_refresh_llm_button()
+	if is_instance_valid(_llm_key_edit):
+		_llm_key_edit.text = ""
+	if is_instance_valid(_llm_url_edit):
+		_llm_url_edit.text = LLM_DEFAULT_URL
+	if is_instance_valid(_llm_model_edit):
+		_llm_model_edit.text = LLM_DEFAULT_MODEL
+	_set_llm_status("已清除游戏内设置，回落到离线 Mock 模式。", true)
+
+func _on_llm_cancel_pressed() -> void:
+	_refresh_llm_button()
+	_close_llm_panel()
+
+func _close_llm_panel() -> void:
+	if is_instance_valid(_llm_panel):
+		_llm_panel.queue_free()
+	_llm_panel = null
+	_llm_url_edit = null
+	_llm_key_edit = null
+	_llm_model_edit = null
+	_llm_status = null
+	_pending_start = false
+	if _start_button != null:
+		_start_button.disabled = false

@@ -1,0 +1,23 @@
+	
+ugc_layout:
+.title_pos 250 144
+.sub_title_pos 210 210
+.sub_title_width 550
+.base_pos 0 28
+.back_button_pos 1723 110
+.back_controller_button_pos 856 100
+.view_area_pos 950.0 130.0
+.view_area_size 800.0 865.0
+.scroll_bar_pos 1620.0 160.0
+.scroll_bar_size 0.0 807.0
+.entry_spacing 1.0
+
+ugc_entry_layout:
+.text_offset 320 14
+.checkbox_offset 0 0
+.checkbox_offset 64 64
+.drag_layout_width 590
+.description_offset 592 0
+.description_box_size 400 500
+.preview_icon_pos 6 6
+.preview_icon_size 51 51

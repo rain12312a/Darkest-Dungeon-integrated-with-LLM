@@ -1,0 +1,89 @@
+
+fe_flow_slot:
+    .mod_banner_offset                      10 10
+    .mode_icon_offset				-16     30
+    .save_estate_name_offset				73   	40
+	.save_area_name_offset         			656   	29
+    .save_area_width            			195
+	.nuke_save_offset						10	   	44
+	.nuke_frame_offset						-10     -10
+	.ugc_save_offset						117	   	30
+	.ugc_frame_offset						110     36
+    .ugc_installed_banner_offset            370.0    107
+    .ugc_installed_banner_text              405     104
+	.dlc_save_offset						65 30
+	.dlc_frame_offset						60 36
+    .dlc_installed_banner_offset 20.0    107
+    .dlc_installed_banner_text 42 104
+	.save_slot_overlay_offset				0       -2
+    .save_envelope_offset					-81   	62
+.slot_delete_ugc_dlc_tooltip_offset         50
+
+fe_flow_positions:
+	.ruins_center							0		-1080
+	.insanity_center						0		-2360
+	.saves_scroll							0   	-1520
+	.preamble_frame							544.5   330
+	.savegame_frame							350	 	1950
+	.savegame_slots_offset					201	  	144
+	.start_button							960	 	2070
+	.start_button_text_offset				0	   	-12
+	.start_button_controller_button_offset 	0 		-108
+	.settings_button						1775   	960
+ 	.mailing_list_button					1700   	960
+	.buy_dlc_button							0	950
+	.title_house							0	 	1486
+	.titles									960 	450
+	.build_num_pos							24  	20
+	.scrolling_text_box						485  	1000
+	.scrolling_text_box_dim					1000    40
+	.scrolling_text_element_spacing			20
+	.sky_pos1								0	 	1450
+	.sky_pos2								300	 	1600	
+    .demo_text                  			960  	900
+    .demo_text_width            			1000
+    .save_slot_window_position              200     548
+    .save_slot_window_size                  1800    434                  
+    .scroll_bar_position                    1500    580
+    .scroll_bar_height                      376 
+
+fe_flow_controls_layout:
+	.controls_element_bottom_start_offset 	-310 980
+	.controls_element_start_offset 			870 -8
+	.controls_element_circus_start_offset 	870 46
+	.controls_element_offset				500 55
+	.controls_button_icon_offset			22 22
+	.controls_text_offset  					64 24
+	.controls_text_width 					300
+
+fe_flow_pvp:
+	.title_offset							409   	40
+
+mode_select_dialog_extras:
+    .tooltip_centre_position 0 400
+    .box_width 500
+    .mode_icon_centre_position 0.0 -90.0
+    .mode_fade_time 0.2
+
+mode_select_dialog_layout:
+.base_pos 960 300
+.question_offset 0 0
+.answers_offset 0 -20
+.back_pos 290 54
+
+mode_select_dialog_question_layout:
+	.text_offset 0 110
+	.text_width 520
+
+mode_select_dialog_answers_layout:
+	.start_offset 0 270
+	.spacing 0 55
+	.number_of_answers_push_up_threshold 2
+
+mode_select_dialog_answer_layout:
+	.text_offset 0 0
+	.button_offset 0 0
+	.button_size 500 55
+	.controller_confirm_button_offset 20 0
+	.selected_overlay_offset 0 -24
+

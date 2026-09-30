@@ -4,32 +4,3 @@
 
 [node name="Start" type="Node"]
 script = ExtResource("1")
-
-[node name="StartUI" type="Control" parent="."]
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 0.0
-offset_bottom = 0.0
-
-[node name="Background" type="ColorRect" parent="StartUI"]
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-color = Color(0.1, 0.1, 0.1, 1)
-
-[node name="Title" type="Label" parent="StartUI"]
-offset_left = 40.0
-offset_top = 30.0
-offset_right = 600.0
-offset_bottom = 80.0
-text = "Dark Dungeon Demo"
-
-[node name="StartButton" type="Button" parent="StartUI"]
-offset_left = 40.0
-offset_top = 100.0
-offset_right = 240.0
-offset_bottom = 150.0
-text = "Start Battle"

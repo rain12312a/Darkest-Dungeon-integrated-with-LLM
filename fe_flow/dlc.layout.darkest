@@ -1,0 +1,24 @@
+	
+dlc_layout:
+.title_pos 230 136
+.sub_title_pos 244 195
+.sub_title_width 550
+.base_pos 450 28
+.back_button_pos 859 103
+.back_controller_button_pos 856 100
+.view_area_pos 210.0 265.0
+.view_area_size 600.0 600.0
+.scroll_bar_pos 820.0 270.0
+.scroll_bar_size 0.0 580.0
+.entry_spacing 6.0
+.progress_forward_button_pos 472 900
+
+dlc_entry_layout:
+.text_offset 300 20
+.checkbox_offset 0 0
+.checkbox_offset 64 64
+.drag_layout_width 520
+.description_offset 592 0
+.description_box_size 400 500
+.preview_icon_pos 6 6
+.preview_icon_size 64 64

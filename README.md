@@ -6,8 +6,11 @@
 
 ## 下载 Download
 
-> ⚠️ 旧的 `v1.0-demo` 发布包（内置 Key 版本）**已下架删除**，正在重新打包。
-> 想现在玩，请按下方「快速开始」从源码运行。
+**只想玩**（Windows x64，免安装）：到 [Releases](https://github.com/rain12312a/Darkest-Dungeon-integrated-with-LLM/releases/latest) 下载 zip → 解压 → 双击 `darkdungeon.exe`。
+
+| 版本 | 大小 | 直链 |
+| --- | --- | --- |
+| `v1.0-demo` | 122.1 MB（exe + pck + 玩家必读） | [darkdungeon-win64-v1.0.zip](https://github.com/rain12312a/Darkest-Dungeon-integrated-with-LLM/releases/download/v1.0-demo/darkdungeon-win64-v1.0.zip) |
 
 **在线 AI 可选**：想用真模型喊话，在开始界面右上角「LLM 设置」填入自己的 API Key 即可（只存本机，不上传）；不配置 / 网络不通时自动改用内置离线引擎（判定逻辑一致，一样能完整游玩）。
 

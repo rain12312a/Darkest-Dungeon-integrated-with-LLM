@@ -12,6 +12,7 @@ extends SceneTree
 #   ⑤ 空白 Key 不算在线配置（= 离线 Mock）
 #   ⑥ user:// 里写坏 JSON → 不崩、不污染回落的配置
 #   ⑦ describe_http_result() 状态码 → 面板文案映射（200/401/403/404/429/500）
+#   ⑨ 工程内没有内置 Key（api_config.gd 不应存在）
 #
 # 未覆盖：test_connection() 的真实联网路径（需外网，建议用开始界面的「保存并测试」手测）。
 # 注意：本探针会**备份并还原** user://llm_config.json 与 res://api_config.json，不破坏你的本地配置。
@@ -164,26 +165,11 @@ func _run() -> void:
 	var r500: Dictionary = c10.describe_http_result(500)
 	_check("⑦ 500 → 提示服务端错误", String(r500.get("message", "")).contains("服务端"))
 	_check("⑦ 未知码也返回可读文案", not String(c10.describe_http_result(418).get("message", "")).is_empty())
-
-	# ⑨ 内置 Key 混淆编解码（必须与 tools\embed_key.ps1 算法一致）
-	var plain := "REDACTED-LEAKED-KEY"
-	var blob: String = c10.encode_key(plain)
-	_check("⑨ 混淆串不含 sk- 明文", not blob.contains("sk-"))
-	_check("⑨ 解码可还原原文", c10.decode_obfuscated_key(blob) == plain)
-	_check("⑨ 空串/非法 Base64 安全返回空", c10.decode_obfuscated_key("") == "" and c10.decode_obfuscated_key("!!!not-base64!!!") == "")
-	_check("⑨ 中文/长串也能往返", c10.decode_obfuscated_key(c10.encode_key("测试-key-1234567890")) == "测试-key-1234567890")
 	c10.free()
 
-	# ⑩ 工程里的 api_config.gd 若用混淆形式，必须能被真实加载（解码链路端到端）
-	var c11 := LLMClient.new()
-	var dev_text := ""
-	if FileAccess.file_exists("res://scripts/battle/api_config.gd"):
-		dev_text = FileAccess.get_file_as_string("res://scripts/battle/api_config.gd")
-	if dev_text.contains("API_KEY_OBF") and not dev_text.contains("sk-"):
-		_check("⑩ 混淆形式的内置 Key 已被解密加载（在线=%s）" % str(c11.has_online_config()), c11.has_online_config())
-	else:
-		_check("⑩ 跳过（api_config.gd 当前不是混淆形式）", true)
-	c11.free()
+	# ⑨ 工程内不得再内置任何 Key（防止重新引入「Key 随包发布」）
+	var embedded := "res://scripts/battle/api_config.gd"
+	_check("⑨ 工程内无内置 Key 配置（api_config.gd 不应存在）", not FileAccess.file_exists(embedded))
 
 
 func _check(label: String, ok: bool) -> void:

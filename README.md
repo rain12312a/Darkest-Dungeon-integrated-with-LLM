@@ -7,7 +7,7 @@
 ## 下载 Download
 
 **只想玩**（Windows x64，免安装）：到 [Releases](https://github.com/rain12312a/Darkest-Dungeon-integrated-with-LLM/releases) 下载 zip → 解压 → 双击 `darkdungeon.exe`。
-**0 配置**：在线 AI 喊话开箱即用；网络不通时自动改用内置离线引擎（判定逻辑一致，一样能完整游玩）。
+**在线 AI 可选**：想用真模型喊话，在开始界面右上角「LLM 设置」填入自己的 API Key 即可（只存本机，不上传）；不配置 / 网络不通时自动改用内置离线引擎（判定逻辑一致，一样能完整游玩）。
 
 | 版本 | 大小 | 直链 |
 | --- | --- | --- |
@@ -17,7 +17,7 @@
 
 ## 亮点 Features
 
-- 🧠 **LLM 英雄激励喊话**：向当前行动的英雄喊话，模型结合战况（血量 / 压力）与**你原话的语气**判定四种结果 —— ① 减压 ② 攻击增益 ③ 加压 ④ 精神崩溃、倒戈攻击队友。**发布版内置直连 Key，玩家双击即用（0 点击）**；未配置 / 网络不可达时自动降级为**离线 Mock**（同一套权重逻辑，离线也能完整游玩），也可在开始界面「LLM 设置」里换成自己的 Key
+- 🧠 **LLM 英雄激励喊话**：向当前行动的英雄喊话，模型结合战况（血量 / 压力）与**你原话的语气**判定四种结果 —— ① 减压 ② 攻击增益 ③ 加压 ④ 精神崩溃、倒戈攻击队友。**发布包不内置任何 Key**：想用真模型，在开始界面右上角「LLM 设置」填入自己的 Key 即可（只存本机）；未配置 / 网络不可达时自动降级为**离线 Mock**（同一套权重逻辑，离线也能完整游玩）
 - 🦴 **自研 Spine 运行时**（纯 GDScript，**不需要**官方 Spine 插件）：解析 `.skel` / `.atlas`，支持 Region / Mesh / SkinnedMesh 附件，逐顶点按骨骼权重蒙皮（Polygon2D）
 - ⚔️ **回合制战斗**：速度浮动 + 行动队列驱动；4 名英雄（十字军 / 强盗 / 神秘学者 / 训犬师）对抗骷髅军团与「门前恶狼」首领战
 - 🩸 **暗黑地牢核心机制**：死门（Death's Door）、压力 / 折磨 / 美德、DoT（流血 / 腐蚀）、晕眩、标记、守护、消耗品、战利品结算
@@ -57,63 +57,47 @@
 
 ### 可选：启用在线 LLM
 
-**玩家侧（双击 exe 就能用）**：开始界面右上角有 **「LLM 设置」** 按钮（显示当前是在线 / 离线）。**发布版只要把代理地址填进 `api_public.gd`（见 [worker/README.md](worker/README.md) 的三步走），玩家连这个按钮都不用点** —— 开局直接就是在线 LLM。
+**发布包不内置任何 API Key**，默认走内置离线 Mock 引擎（四种结果逻辑完整，纯离线也能玩）。
+想用真模型，在开始界面**右上角「LLM 设置」**里填自己的 Key 就行：
 
-只有在**完全没有可用在线配置**时，首次点 `START` 才会自动弹一次引导面板，二选一：
+1. 打开游戏 → 主界面**右上角**点 **「LLM 设置 · 离线」**
+2. 填入 **API 地址**（已预填 `https://api.deepseek.com/v1/chat/completions`）、**API Key**、**模型**（默认 `deepseek-chat`）
+3. 点 **「保存并测试」** → 面板先测试连通性（8 秒超时），通过即生效，**无需重启、无需重新打包**
 
-- **离线开始** — 不填任何东西，用内置离线 Mock 引擎，四种结果逻辑完整
-- **保存并开始** — 填入 API Key（或自建代理地址 + 代理令牌），面板会先**测试连通性**再开局
+设置只写入本机 `%APPDATA%\Godot\app_userdata\darkdungeon\llm_config.json`，不会上传，也不影响存档。
+（填错了随时点「清除（改用离线）」即可回落。）
 
-设置写入本机 `%APPDATA%\Godot\app_userdata\darkdungeon\llm_config.json`，随时可改，不影响存档。
+首次点 `START` 时若完全没有可用在线配置，会自动弹一次同一个面板（`离线开始` / `保存并开始` 二选一）。
 
 **配置优先级**（低 → 高，后写入的非空字段覆盖前者）：
 
 | 优先级 | 来源 | 用途 |
 | --- | --- | --- |
-| ① | `scripts/battle/api_config.gd` | **内置直连 Key**（`.gitignore` 忽略，**随包发布**；建议用 `tools/embed_key.ps1` 混淆存放） |
-| ② | `scripts/battle/api_public.gd` | 自建代理地址 + 公开令牌（可入库；**填了就优先于 ①**，真 Key 只存在 Worker 里，最安全） |
-| ③ | exe 同目录 `api_config.json` | 便携覆盖，免重新打包 |
-| ④ | `user://llm_config.json` | 开始界面「LLM 设置」面板写入 |
+| ① | `scripts/battle/api_public.gd` | 可选的**自建代理**地址 + 公开令牌（可入库；真 Key 只存在 Worker 环境变量里，最安全） |
+| ② | exe 同目录 `api_config.json` | 便携覆盖，免让玩家手填（适合批量分发预置配置） |
+| ③ | `user://llm_config.json` | 开始界面右上角「LLM 设置」面板写入（玩家自己的 Key） |
 
-**开发者侧**：`scripts/battle/api_config.gd` 已被 `.gitignore` 忽略，克隆后自行创建：
-
-```gdscript
-const API_KEY := ""                       # 明文（本地调试用）；留空且 OBF 也为空 = 离线 Mock
-const API_KEY_OBF := ""                   # 混淆形式（推荐），由 tools\embed_key.ps1 生成
-const API_URL := "https://api.deepseek.com/v1/chat/completions"
-const MODEL := "deepseek-chat"
-```
-
-> 🚀 **发布版是「内置直连 Key」模式（0 点击）**：
-> ```powershell
-> powershell -ExecutionPolicy Bypass -File tools\embed_key.ps1      # 明文 Key → 混淆形式
-> powershell -ExecutionPolicy Bypass -File tools\export_release.ps1 # 导出 + 自动校验
-> ```
-> - **好处**：玩家双击 exe → 点 START 直接开局，不用配任何东西；也不用买域名/搭代理。
-> - **代价**：Key 随包发布，拿到 exe 且愿意动手的人理论上能还原出来（脚本已把它混淆成 Base64，包里搜不到 `sk-` 明文，挡掉 GitHub 密钥扫描 / 自动化爬虫 / `strings` 批量扫描）。
-> - **必做**：① 在 DeepSeek 控制台给这个 Key **设消费上限**；② 用**独立于日常使用的 Key**，被盗用就去控制台**吊销**它 —— 旧 exe 会自动降级为离线 Mock，不会坏掉。
-> - ⚠️ 千万不要把 `api_config.gd` 手动 `git add`（它默认被忽略；`tools/embed_key.ps1` 会帮你确认这一点）。
-> - 想改用「真 Key 不落玩家机器」的自建代理方案，见 [worker/README.md](worker/README.md)。
+> 🔐 **本仓库不内置任何 Key**。打进 exe / pck 的 Key 等价于公开的 Key（pck 只是 zstd 压缩，XOR+Base64 混淆也一解就出），
+> 因此早前那套「Key 随包发布」的做法已废弃。想让玩家无需填 Key 又不想暴露真 Key，请用 [worker/README.md](worker/README.md) 的 Cloudflare Worker 代理方案。
 
 ## 发布 Release
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\embed_key.ps1        # ① 明文 Key → 混淆串（仅在换 Key 时需要）
-powershell -ExecutionPolicy Bypass -File tools\export_release.ps1   # ② 导出 + 自动校验
-# ③ 打包与上传：dist\release.ps1（建/复用 Release）+ dist\upload_asset.ps1（curl 上传 zip）
+powershell -ExecutionPolicy Bypass -File tools\export_release.ps1   # ① 导出 + 自动校验
+# ② 打包与上传：dist\release.ps1（建/复用 Release）+ dist\upload_asset.ps1（curl 上传 zip）
 ```
 
 `tools/export_release.ps1` 会自动校验四件事：
 
 | 校验项 | 说明 |
 | --- | --- |
-| 发布模式 | 自动判定「内置直连 Key / 自建代理 / 离线 Mock」并给出对应提醒 |
-| 明文残留 | `api_config.gd` 里若还有 `sk-` 明文直接报错（提示先跑 `embed_key.ps1`） |
-| 包内清单 | `pck` 文件表里不得出现 `tools/`、`worker/`，且内置 Key 必须真的随包 |
+| 包内清单 | `pck` 文件表里不得出现 `api_config.*` / `tools/` / `worker/`（不内置任何 Key） |
+| 发布模式 | 判定「自建代理 / 玩家自行配置」并给出对应提醒；`api_public.gd` 里若混入 `sk-` 真 Key 直接报错 |
+| Spine 数据 | `.skel` / `.atlas` 必须全部随包（漏了英雄 / 怪物会整体不可见） |
 | 日志读取 | Godot 是 GUI 子系统程序：变量捕获为空、管道又会被控制台编码（GBK）吞字符 → 脚本改用 `cmd` 字节级重定向 + UTF-8 读日志 |
 
 > ⚠️ 测导出包请**复制到工程目录之外**再运行：模板 exe 的 `res://` 在包里找不到文件时会回落到 exe 同目录的真实文件系统，
-> 放在工程目录里会读到本地的 `api_config.gd`，容易误判成「包里泄露了真 Key」。
+> 放在工程目录里会读到本地的 `api_config.json`，容易误判成「包内带上了本地配置」。
 
 ## 关于 `.import` 与首次导入
 
@@ -160,7 +144,6 @@ darkdungeon/
 ├── audio/                    # bgm/ + sfx/（提取后的 ogg）+ 原版 load_order json
 ├── overlays/  panels/  crypts/  fe_flow/  assets/   # 图标 / 面板 / 场景图 / 前端素材
 ├── tools/                    # 验证探针（_probe_*.gd）与截图脚本（_shot_*.gd）
-│   ├── embed_key.ps1         # 明文 Key → 混淆串（API_KEY_OBF）
 │   └── export_release.ps1    # 导出 + 发布包自动校验
 │
 ├── worker/                   # 可选的 Cloudflare Worker 代理方案（真 Key 不落玩家机器）

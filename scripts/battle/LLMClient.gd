@@ -20,16 +20,14 @@ const OUTCOME_TAGS := {
 # ============================================================
 # API 配置加载
 # 优先级（低 → 高），全部为空则自动降级为离线 Mock：
-#   ① res://scripts/battle/api_config.gd —— **内置直连 Key**（该文件被 .gitignore 忽略、不进 git 仓库；
-#      导出预设故意**不**排除它 → Key 随包发布。强烈建议用 tools\embed_key.ps1 写成 API_KEY_OBF 混淆形式，
-#      这样 exe/pck 里搜不到 "sk-" 明文，能挡掉绝大多数自动化爬虫）
-#   ② res://scripts/battle/api_public.gd —— 自建代理（填了地址就**优先于**①；真 Key 只存 Worker 里，最安全）
-#   ③ exe 同目录 api_config.json（编辑器内读工程根目录）—— 便携覆盖，免重新打包
-#   ④ user://llm_config.json —— 开始界面「LLM 设置」面板写入（玩家自己填的 Key，最高）
-# ⚠️ 内置 Key = 任何拿到 exe 的人理论上都能还原出来。务必用「独立 Key + 服务端消费上限」，
-#    一旦发现被盗用，去控制台吊销该 Key 即可（旧 exe 会自动降级为离线 Mock，不会坏掉）。
+#   ① res://scripts/battle/api_public.gd —— 自建代理（可选；真 Key 只存 Worker 环境变量里，最安全）
+#   ② exe 同目录 api_config.json（编辑器内读工程根目录）—— 便携覆盖，免重新打包
+#   ③ user://llm_config.json —— 开始界面右上角「LLM 设置」面板写入（玩家自己填的 Key，最高）
+#
+# ⚠️ 本工程**不内置 / 不发布任何 Key**：
+#    Key 由玩家在开始界面右上角「LLM 设置」里自己填写，只写入本机 user://llm_config.json，
+#    既不随导出包发布，也不会进 Git 仓库。仓库里出现 sk- 明文应立即吊销该 Key。
 # ============================================================
-const DEV_CONFIG_PATH := "res://scripts/battle/api_config.gd"
 const PUBLIC_CONFIG_PATH := "res://scripts/battle/api_public.gd"
 const EXTERNAL_CONFIG_NAME := "api_config.json"
 const USER_CONFIG_PATH := "user://llm_config.json"
@@ -52,7 +50,6 @@ func reload() -> void:
 	model = DEFAULT_MODEL
 	config_source = "离线 Mock 引擎"
 	# 从低到高依次应用，后面的来源会覆盖前面的同名非空字段
-	_apply_gd_config(DEV_CONFIG_PATH, "内置直连 Key（api_config.gd）")
 	_apply_gd_config(PUBLIC_CONFIG_PATH, "内置代理（api_public.gd）")
 	_apply_json_file(_external_config_path(), EXTERNAL_CONFIG_NAME)
 	_apply_json_file(USER_CONFIG_PATH, "游戏内设置")
@@ -68,10 +65,7 @@ func _apply_gd_config(path: String, source: String = "") -> void:
 	var cfg: Resource = load(path)
 	if cfg == null:
 		return
-	var key := _variant_str(cfg.get("API_KEY"))
-	if key.strip_edges().is_empty():
-		key = decode_obfuscated_key(_variant_str(cfg.get("API_KEY_OBF")))
-	_assign_config(key, _variant_str(cfg.get("API_URL")), _variant_str(cfg.get("MODEL")), source)
+	_assign_config(_variant_str(cfg.get("API_KEY")), _variant_str(cfg.get("API_URL")), _variant_str(cfg.get("MODEL")), source)
 
 # 外置 JSON 配置路径：导出后取 exe 同目录，编辑器内取工程根目录
 func _external_config_path() -> String:
@@ -87,10 +81,7 @@ func _apply_json_file(path: String, source: String = "") -> void:
 		push_warning("[LLM] " + path + " 不是合法 JSON，已忽略")
 		return
 	var dict: Dictionary = parsed
-	var key := _dict_str(dict, "API_KEY")
-	if key.strip_edges().is_empty():
-		key = decode_obfuscated_key(_dict_str(dict, "API_KEY_OBF"))
-	_assign_config(key, _dict_str(dict, "API_URL"), _dict_str(dict, "MODEL"), source)
+	_assign_config(_dict_str(dict, "API_KEY"), _dict_str(dict, "API_URL"), _dict_str(dict, "MODEL"), source)
 	print("[LLM] 已加载", source, "：", path)
 
 func _assign_config(key: String, url: String, model_name: String, source: String = "") -> void:
@@ -104,37 +95,6 @@ func _assign_config(key: String, url: String, model_name: String, source: String
 		api_url = url
 	if not model_name.strip_edges().is_empty():
 		model = model_name
-
-# ============================================================
-# Key 混淆（**不是加密**）：只为了让 exe / pck / 仓库里搜不到 "sk-" 明文，
-# 挡掉 GitHub 密钥扫描、自动化爬虫、`strings | grep sk-` 这类批量工具。
-# 算法：UTF-8 字节 XOR 循环盐 → Base64；由 tools\embed_key.ps1 生成，两边必须一致。
-# ============================================================
-const KEY_SALT := "darkdungeon-2026"
-
-func encode_key(plain: String) -> String:
-	var salt := KEY_SALT.to_utf8_buffer()
-	var raw := plain.to_utf8_buffer()
-	var out := PackedByteArray()
-	out.resize(raw.size())
-	for i in raw.size():
-		out[i] = raw[i] ^ salt[i % salt.size()]
-	return Marshalls.raw_to_base64(out)
-
-func decode_obfuscated_key(blob: String) -> String:
-	var s := blob.strip_edges()
-	if s.is_empty():
-		return ""
-	var raw := Marshalls.base64_to_raw(s)
-	if raw.is_empty():
-		push_warning("[LLM] API_KEY_OBF 不是合法 Base64，已忽略")
-		return ""
-	var salt := KEY_SALT.to_utf8_buffer()
-	var out := PackedByteArray()
-	out.resize(raw.size())
-	for i in raw.size():
-		out[i] = raw[i] ^ salt[i % salt.size()]
-	return out.get_string_from_utf8()
 
 # ============================================================
 # 在线请求熔断：连续失败（被墙 / Key 被吊销 / 超额 / 超时）后，

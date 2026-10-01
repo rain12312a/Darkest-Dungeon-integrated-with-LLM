@@ -4,14 +4,13 @@ extends SceneTree
 # LLM 配置加载优先级验证（无头可跑）
 # 运行：godot --headless --path . --script res://tools/_probe_llm_config.gd
 #
-# 校验三级配置来源的行为：
-#   ① 无外置 JSON → api_config.gd（本地开发，含真 Key）生效
-#   ② api_config.json 全字段 → 覆盖 gd 配置（免重新打包换 Key / 换代理）
-#   ③ JSON 只写部分字段 → 其余字段保留原值
-#   ④ JSON 不合法 → 安全忽略，回落到 gd
+# 校验配置来源的行为（本工程**不内置任何 Key**）：
+#   ① 无 api_config.json 时：默认「离线 Mock」，地址 / 模型回到默认值
+#   ② api_config.json 全字段 → 生效
+#   ③ JSON 只写部分字段 → 其余字段保留默认值
+#   ④ JSON 不合法 → 安全忽略，回落到默认值
 #   ⑤ JSON 里是空串/空白 → 不覆盖已有配置
-# 注：导出包中 api_config.gd 已被 export_presets.cfg 的 exclude_filter 排除，
-#     因此导出后 ① 不成立，会自然降级为 api_public.gd 或离线 Mock。
+# 注：游戏内「LLM 设置」写入的 user://llm_config.json 优先级最高，探针会先把它移开再跑。
 # ============================================================
 
 const JSON_PATH := "res://api_config.json"
@@ -56,39 +55,42 @@ func _run() -> void:
 	_isolate_user_cfg()
 	_cleanup()
 
-	# ① 本地开发配置
+	# ① 无任何外置配置：不内置 Key → 离线 Mock，地址 / 模型为默认值
 	var base := LLMClient.new()
-	_check("① 无外置 JSON 时载入 api_config.gd 的 Key", not base.api_key.strip_edges().is_empty())
-	var dev_key := base.api_key
-	var dev_url := base.api_url
-	var dev_model := base.model
+	_check("① 默认无在线配置（离线 Mock）", not base.has_online_config())
+	var base_key := base.api_key
+	var base_url := base.api_url
+	var base_model := base.model
+	_check("① 默认地址为 DeepSeek 官方端点", base_url == LLMClient.DEFAULT_API_URL)
+	_check("① 默认模型", base_model == LLMClient.DEFAULT_MODEL)
 	base.free()
 
-	# ② 外置 JSON 全字段覆盖
+	# ② 外置 JSON 全字段生效
 	_write_json('{"API_KEY":"ext-key-123","API_URL":"https://example.workers.dev","MODEL":"ext-model"}')
 	var c2 := LLMClient.new()
-	_check("② Key 被外置 JSON 覆盖", c2.api_key == "ext-key-123")
-	_check("② URL 被外置 JSON 覆盖", c2.api_url == "https://example.workers.dev")
-	_check("② MODEL 被外置 JSON 覆盖", c2.model == "ext-model")
+	_check("② Key 来自外置 JSON", c2.api_key == "ext-key-123")
+	_check("② URL 来自外置 JSON", c2.api_url == "https://example.workers.dev")
+	_check("② MODEL 来自外置 JSON", c2.model == "ext-model")
+	_check("② has_online_config 变 true", c2.has_online_config())
 	c2.free()
 
-	# ③ 只写 URL，Key 应保留 gd 的值
+	# ③ 只写 URL：Key 不应被凭空造出来
 	_write_json('{"API_URL":"https://proxy-only.example"}')
 	var c3 := LLMClient.new()
-	_check("③ 只改 URL 时 Key 仍来自 gd", c3.api_key == dev_key)
+	_check("③ 只改 URL 时 Key 仍为空", c3.api_key == base_key)
 	_check("③ URL 来自外置 JSON", c3.api_url == "https://proxy-only.example")
 	c3.free()
 
 	# ④ 非法 JSON
 	_write_json('{ this is not json')
 	var c4 := LLMClient.new()
-	_check("④ 非法 JSON 不破坏配置", c4.api_key == dev_key and c4.api_url == dev_url)
+	_check("④ 非法 JSON 不破坏配置", c4.api_key == base_key and c4.api_url == base_url)
 	c4.free()
 
 	# ⑤ 空值 / 空白值
 	_write_json('{"API_KEY":"   ","API_URL":""}')
 	var c5 := LLMClient.new()
-	_check("⑤ 空值不覆盖已有配置", c5.api_key == dev_key and c5.api_url == dev_url and c5.model == dev_model)
+	_check("⑤ 空值不覆盖已有配置", c5.api_key == base_key and c5.api_url == base_url and c5.model == base_model)
 	c5.free()
 
 	_cleanup()

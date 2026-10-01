@@ -35,8 +35,5 @@ dist/
 shot_*.png
 *_log.txt
 
-# API keys (sensitive)
-scripts/battle/api_config.gd
-
-# 外置 LLM 配置（放在此处的本地覆盖，玩家在 exe 同目录自己放）
+# 外置 LLM 配置（本工程不内置任何 Key；玩家在 exe 同目录自己放，或用游戏内「LLM 设置」写入 user://）
 api_config.json

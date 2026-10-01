@@ -1,6 +1,6 @@
 # LLM 代理部署指南
 
-公开试玩版直接双击就能用在线 LLM，而**你的 DeepSeek Key 不会出现在 exe 里** —— 靠的就是这一层代理：
+想让玩家「双击就玩上在线 LLM」，而**你的 DeepSeek Key 又不会出现在 exe 里** —— 靠的就是这一层代理：
 
 ```
 玩家 exe（只有公开的客户端令牌）
@@ -16,11 +16,11 @@ DeepSeek API
 
 ---
 
-## 三步走（玩家 **0 点击** 路线）
+## 三步走（玩家 **无需配置** 路线）
 
-> 当前的发布版走的是**另一种 0 点击方案：内置直连 Key**（`tools/embed_key.ps1`，Key 随包发布）。
-> 下面这套代理方案是它的“升级版”——真 Key 不落到玩家机器上。两者可以共存：
-> **填了 `api_public.gd` 的代理地址就会自动优先于内置 Key**（优先级 ② > ①）。
+> 本工程**不内置任何 Key**（早前那套「内置直连 Key」已废弃：打进 exe 的 Key 等价于公开的 Key）。
+> 代理方案是「玩家双击即用」与「不暴露真 Key」兼得的做法：
+> **只要 `api_public.gd` 里填了代理地址，游戏就自动用它**，玩家不必手填任何东西。
 
 | # | 做什么 | 命令 / 位置 |
 | --- | --- | --- |
@@ -30,7 +30,7 @@ DeepSeek API
 
 完成后玩家只需：**双击 exe → 点 START → 直接开局**。因为 `api_public.gd` 已有可用配置，开始界面**不会**弹首次引导面板（`StartController._needs_llm_setup()`）；主菜单右上角的「LLM 设置」仍然在，想换成自己的 Key 的玩家才需要点它。
 
-导出日志若出现「公开版 api_public.gd 的 API_URL 为空」的黄色提示，说明第 2 步还没做。
+导出日志若出现「OK 发布模式：不内置任何 Key —— 玩家在开始界面右上角「LLM 设置」自行填 Key」的提示，说明第 2 步还没做。
 
 ---
 
@@ -106,7 +106,7 @@ const API_KEY := "dd-7f3a91c2e5b4"   # 与 Worker 的 CLIENT_TOKEN 一致
 
 ## 玩家侧：想用自己的 Key 怎么办
 
-**游戏内直接填**（推荐）：开始界面右上角 **「LLM 设置」** → 填 API 地址 + Key → **「保存并测试」**，连通性通过即生效，**无需重新打包**，也不用重启游戏。设置存在 `user://llm_config.json`（`%APPDATA%\Godot\app_userdata\darkdungeon\llm_config.json`），优先级**高于**下面的 `api_config.json`。
+**游戏内直接填**（推荐）：开始界面右上角 **「LLM 设置」** → 填 API 地址 + Key → **「保存并测试」**，连通性通过即生效，**无需重新打包**，也不用重启游戏。设置存在 `user://llm_config.json`（`%APPDATA%\Godot\app_userdata\darkdungeon\llm_config.json`），只在自己机器上，不会上传；优先级**高于**下面的 `api_config.json`，也高于 `api_public.gd` 里的代理配置。
 
 **或放文件**：在 `darkdungeon.exe` 同目录放一个 `api_config.json`（适合批量分发预置配置）：
 

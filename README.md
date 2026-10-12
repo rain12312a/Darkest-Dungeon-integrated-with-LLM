@@ -4,6 +4,17 @@
 
 > **游戏流程**：`Start`（闪屏 → 主菜单）→ `Map`（随机地牢，逐房探索）→ `Battle`（回合制战斗）→ 胜利返回 `Map` / 击败首领通关返回 `Start`
 
+## 截图 Screenshots
+
+![战斗界面](docs/screenshots/02-battle.png)
+
+|  |  |  |
+| :---: | :---: | :---: |
+| ![开始界面](docs/screenshots/01-start-menu.png) | ![选择目标](docs/screenshots/03-select-target.png) | ![输入喊话](docs/screenshots/04-inspire-input.png) |
+| 开始界面 · 选择地牢尺寸 | 战斗中 · 选技能与目标 | 战斗中 · 对英雄喊话 |
+| ![LLM 判定结果](docs/screenshots/05-inspire-reply.png) | ![选择友方目标](docs/screenshots/06-select-ally.png) | ![压力积累与首领战](docs/screenshots/07-boss-stress.png) |
+| LLM 判定结果并联动数值 | 选择友方目标 | 压力积累 / 首领战 |
+
 ## 下载 Download
 
 **只想玩**（Windows x64，免安装）：到 [Releases](https://github.com/rain12312a/Darkest-Dungeon-integrated-with-LLM/releases/latest) 下载 zip → 解压 → 双击 `darkdungeon.exe`。
